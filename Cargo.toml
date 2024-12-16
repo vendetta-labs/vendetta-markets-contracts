@@ -1,0 +1,54 @@
+[workspace]
+members = ["contracts/*"]
+
+# Resolver has to be set explicitely in workspaces, see https://github.com/rust-lang/cargo/issues/9956
+resolver = "2"
+
+[workspace.package]
+version = "2.0.0"
+authors = [
+    "André Sardo <andre@vendetta-labs.dev>",
+    "Gustavo Mauricio <gustavo@vendetta-labs.dev>",
+]
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/vendetta-labs/vendetta-markets-smart-contracts"
+homepage = "https://vendetta.markets"
+documentation = "https://docs.vendetta.markets"
+keywords = ["vendetta", "markets", "cosmos", "cosmwasm"]
+
+[workspace.dependencies]
+cosmwasm-schema = "2.0.2"
+cosmwasm-std = "2.0.2"
+cw2 = "2.0.0"
+cw-controllers = "2.0.0"
+cw-multi-test = "2.0.0"
+cw-storage-plus = "2.0.0"
+cw-utils = "2.0.0"
+schemars = "0.8.15"
+semver = "1"
+serde = { version = "1.0.188", default-features = false, features = ["derive"] }
+thiserror = "1.0.4"
+
+parimutuel-market = { path = "contracts/parimutuel-market", version = "2.0.0", features = [
+    "library",
+] }
+fixed-odds-market = { path = "contracts/fixed-odds-market", version = "2.0.0", features = [
+    "library",
+] }
+
+[profile.release.package.parimutuel-market]
+codegen-units = 1
+incremental = false
+
+[profile.release.package.fixed-odds-market]
+codegen-units = 1
+incremental = false
+
+[profile.release]
+rpath = false
+lto = true
+overflow-checks = true
+opt-level = 3
+debug = false
+debug-assertions = false
