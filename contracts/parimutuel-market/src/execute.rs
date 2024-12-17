@@ -340,3 +340,194 @@ pub fn execute_cancel(deps: DepsMut, info: MessageInfo) -> Result<Response, Cont
         .add_attribute("total_away", TOTAL_AWAY.load(deps.storage)?.to_string())
         .add_attribute("total_draw", TOTAL_DRAW.load(deps.storage)?.to_string()))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use crate::contract::{execute, instantiate, query, ADMIN_ADDRESS};
+    use crate::msg::{BetsResponse, ExecuteMsg, InstantiateMsg, MarketResponse, QueryMsg};
+
+    use super::*;
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
+    use cosmwasm_std::{from_json, Timestamp};
+
+    const NATIVE_DENOM: &str = "denom";
+
+    mod cancel_market {
+        use super::*;
+
+        #[test]
+        fn proper_cancel_market() {
+            let mut deps = mock_dependencies();
+            let mut env = mock_env();
+            env.block.time = Timestamp::from_seconds(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 60 * 45, // 45 minutes in the future
+            );
+
+            let start_timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs()
+                + 60 * 10; // 10 minutes from now
+            let msg = InstantiateMsg {
+                denom: NATIVE_DENOM.to_string(),
+                fee_bps: 250,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                start_timestamp,
+                is_drawable: true,
+            };
+            let info = message_info(&Addr::unchecked(ADMIN_ADDRESS), &[]);
+            instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+            let res = query(deps.as_ref(), env.clone(), QueryMsg::Market {}).unwrap();
+            let value: MarketResponse = from_json(&res).unwrap();
+            assert_eq!(Status::ACTIVE, value.market.status);
+
+            let info = message_info(&Addr::unchecked(ADMIN_ADDRESS), &[]);
+            let msg = ExecuteMsg::Cancel {};
+            let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+            assert_eq!(0, res.messages.len());
+
+            let res = query(deps.as_ref(), env.clone(), QueryMsg::Market {}).unwrap();
+            let value: MarketResponse = from_json(&res).unwrap();
+            assert_eq!(Status::CANCELLED, value.market.status);
+        }
+
+        #[test]
+        fn unauthorized() {
+            let mut deps = mock_dependencies();
+            let mut env = mock_env();
+            env.block.time = Timestamp::from_seconds(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 60 * 45, // 45 minutes in the future
+            );
+
+            let start_timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs()
+                + 60 * 10; // 10 minutes from now
+            let msg = InstantiateMsg {
+                denom: NATIVE_DENOM.to_string(),
+                fee_bps: 250,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                start_timestamp,
+                is_drawable: true,
+            };
+            let info = message_info(&Addr::unchecked(ADMIN_ADDRESS), &[]);
+            instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+            let res = query(deps.as_ref(), env.clone(), QueryMsg::Market {}).unwrap();
+            let value: MarketResponse = from_json(&res).unwrap();
+            assert_eq!(Status::ACTIVE, value.market.status);
+
+            let anyone = deps.api.addr_make("ANYONE");
+            let info = message_info(&anyone, &[]);
+            let msg = ExecuteMsg::Cancel {};
+            let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap_err();
+            assert_eq!(ContractError::Unauthorized {}, res);
+
+            let res = query(deps.as_ref(), env.clone(), QueryMsg::Market {}).unwrap();
+            let value: MarketResponse = from_json(&res).unwrap();
+            assert_ne!(Status::CANCELLED, value.market.status);
+        }
+
+        #[test]
+        fn market_not_active() {
+            let mut deps = mock_dependencies();
+            let mut env = mock_env();
+            env.block.time = Timestamp::from_seconds(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs(),
+            );
+
+            let start_timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs()
+                + 60 * 10; // 10 minutes from now
+            let msg = InstantiateMsg {
+                denom: NATIVE_DENOM.to_string(),
+                fee_bps: 250,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                start_timestamp,
+                is_drawable: true,
+            };
+            let info = message_info(&Addr::unchecked(ADMIN_ADDRESS), &[]);
+            instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+            let info = message_info(
+                &Addr::unchecked(ADMIN_ADDRESS),
+                &[coin(1_000, NATIVE_DENOM)],
+            );
+            let msg = ExecuteMsg::PlaceBet {
+                result: MarketResult::DRAW,
+                receiver: None,
+            };
+            execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+            let info = message_info(
+                &Addr::unchecked(ADMIN_ADDRESS),
+                &[coin(1_000, NATIVE_DENOM)],
+            );
+            let msg = ExecuteMsg::PlaceBet {
+                result: MarketResult::AWAY,
+                receiver: None,
+            };
+            execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+            let res = query(deps.as_ref(), env.clone(), QueryMsg::Bets {}).unwrap();
+            let value: BetsResponse = from_json(&res).unwrap();
+            assert_eq!(1_000, value.totals.total_draw);
+            assert_eq!(1_000, value.totals.total_away);
+            assert_eq!(0, value.totals.total_home);
+
+            let mut env = mock_env();
+            env.block.time = Timestamp::from_seconds(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 60 * 45, // 45 minutes in the future
+            );
+
+            let info = message_info(&Addr::unchecked(ADMIN_ADDRESS), &[]);
+            let msg = ExecuteMsg::Score {
+                result: MarketResult::DRAW,
+            };
+            execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+            let res = query(deps.as_ref(), env.clone(), QueryMsg::Market {}).unwrap();
+            let value: MarketResponse = from_json(&res).unwrap();
+            assert_ne!(Status::ACTIVE, value.market.status);
+
+            let info = message_info(&Addr::unchecked(ADMIN_ADDRESS), &[]);
+            let msg = ExecuteMsg::Cancel {};
+            let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap_err();
+            assert_eq!(ContractError::MarketNotActive {}, res);
+
+            let res = query(deps.as_ref(), env.clone(), QueryMsg::Market {}).unwrap();
+            let value: MarketResponse = from_json(&res).unwrap();
+            assert_ne!(Status::CANCELLED, value.market.status);
+        }
+    }
+}

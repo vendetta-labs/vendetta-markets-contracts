@@ -23,8 +23,6 @@ pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const ADMIN_ADDRESS: &str = "neutron15yhlj25av4fkw6s8qwnzerp490pkxmn9094g7r";
 pub const TREASURY_ADDRESS: &str = "neutron12v9pqx602k3rzm5hf4jewepl8na4x89ja4td24";
 
-// INSTANTIATE
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -80,8 +78,6 @@ pub fn instantiate(
         .add_attribute("status", Status::ACTIVE.to_string()))
 }
 
-// QUERY
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -96,8 +92,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
     }
 }
-
-// EXECUTE
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
@@ -171,36 +165,4 @@ mod tests {
         assert_eq!(Status::ACTIVE, value.market.status);
         assert_eq!(None, value.market.result);
     }
-
-    // #[test]
-    // fn increment() {
-    //     let mut deps = mock_dependencies();
-
-    //     let msg = InstantiateMsg {
-    //         denom: NATIVE_DENOM.to_string(),
-    //         fee_bps: 250,
-    //         id: "game-cs2-test-league".to_string(),
-    //         label: "CS2 - Test League - Team A vs Team B".to_string(),
-    //         home_team: "Team A".to_string(),
-    //         away_team: "Team B".to_string(),
-    //         start_timestamp: SystemTime::now()
-    //             .duration_since(UNIX_EPOCH)
-    //             .expect("Time went backwards")
-    //             .as_secs()
-    //             + 60 * 5, // 5 minutes from now
-    //         is_drawable: true,
-    //     };
-    //     let info = mock_info("creator", &coins(2, "token"));
-    //     let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-    //     // beneficiary can release it
-    //     let info = mock_info("anyone", &coins(2, "token"));
-    //     let msg = ExecuteMsg::Increment {};
-    //     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-    //     // should increase counter by 1
-    //     let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-    //     let value: GetCountResponse = from_json(&res).unwrap();
-    //     assert_eq!(18, value.count);
-    // }
 }
