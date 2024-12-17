@@ -34,5 +34,5 @@
 
 ### Cancel market
 - [x] It properly cancels the market
-- [x] It cant score the market if sender isnt the admin
-- [x] It cant score the market if it is no longer active
+- [x] It cant cancel the market if sender isnt the admin
+- [x] It cant cancel the market if it is no longer active
