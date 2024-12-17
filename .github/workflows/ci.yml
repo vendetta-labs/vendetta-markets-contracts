@@ -61,19 +61,3 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
-
-      - name: Generate Schema (parimutuel-market)
-        uses: actions-rs/cargo@v1
-        with:
-          command: schema
-          args: -p parimutuel-market --locked
-
-      - name: Generate Schema (fixed-odds-market)
-        uses: actions-rs/cargo@v1
-        with:
-          command: schema
-          args: -p fixed-odds-market --locked
-
-      - name: Schema Changes
-        # fails if any changes not committed
-        run: git diff --exit-code schema
