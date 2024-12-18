@@ -5,6 +5,7 @@ use crate::{
     state::{Config, Market, MarketResult},
     TotalBets,
 };
+
 #[cw_serde]
 pub struct InstantiateMsg {
     pub fee_bps: u64, // Fee in basis points
@@ -16,6 +17,7 @@ pub struct InstantiateMsg {
     pub start_timestamp: u64,
     pub is_drawable: bool,
 }
+
 #[cw_serde]
 pub enum ExecuteMsg {
     PlaceBet {

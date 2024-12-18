@@ -586,12 +586,14 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 name = "fixed-odds-market"
 version = "2.0.0"
 dependencies = [
+ "assert_matches",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
  "cw2",
+ "derivative",
  "schemars",
  "semver",
  "serde",

@@ -20,6 +20,7 @@ library = []
 [dependencies]
 cosmwasm-schema = { workspace = true }
 cw2 = { workspace = true }
+cw-utils = { workspace = true }
 cw-storage-plus = { workspace = true }
 cosmwasm-std = { workspace = true }
 schemars = { workspace = true }
@@ -29,4 +30,5 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 cw-multi-test = { workspace = true }
-cw-utils = { workspace = true }
+assert_matches = "1"
+derivative = "2"
