@@ -204,7 +204,7 @@ pub fn execute_update(
     start_timestamp: u64,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let market = MARKET.load(deps.storage)?;
+    let mut market = MARKET.load(deps.storage)?;
 
     if info.sender != config.admin_addr {
         return Err(ContractError::Unauthorized {});
@@ -214,7 +214,6 @@ pub fn execute_update(
         return Err(ContractError::MarketNotActive {});
     }
 
-    let mut market = MARKET.load(deps.storage)?;
     market.start_timestamp = start_timestamp;
 
     MARKET.save(deps.storage, &market)?;
