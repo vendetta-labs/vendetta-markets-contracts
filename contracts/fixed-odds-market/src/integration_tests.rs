@@ -145,10 +145,13 @@ mod tests {
         let msg = InstantiateMsg {
             denom: NATIVE_DENOM.to_string(),
             fee_bps: DEFAULT_FEE_BPS,
+            max_bet_ratio: 20,
             id: "game-cs2-test-league".to_string(),
             label: "CS2 - Test League - Team A vs Team B".to_string(),
             home_team: "Team A".to_string(),
+            home_odds: Uint128::new(205) * Uint128::from(1_000_000_u128),
             away_team: "Team B".to_string(),
+            away_odds: Uint128::new(185) * Uint128::from(1_000_000_u128),
             start_timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards")

@@ -38,4 +38,10 @@ pub enum ContractError {
 
     #[error("No winnings")]
     NoWinnings {},
+
+    #[error("Minimum odds not kept")]
+    MinimumOddsNotKept {},
+
+    #[error("Max bet exceeded")]
+    MaxBetExceeded {},
 }

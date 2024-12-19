@@ -1,7 +1,12 @@
-use cosmwasm_std::{coin, Addr, BankMsg, CosmosMsg, DepsMut, Env, MessageInfo, Response, Uint128};
+use cosmwasm_std::{
+    coin, Addr, BankMsg, CosmosMsg, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+};
 
 use crate::{
-    state::{MarketResult, Status, CLAIMS, CONFIG, MARKET},
+    state::{
+        MarketResult, Odd, Status, AWAY_BETS, AWAY_TOTAL_PAYOUT, CLAIMS, CONFIG, HOME_BETS,
+        HOME_TOTAL_PAYOUT, MARKET,
+    },
     ContractError,
 };
 
@@ -10,6 +15,7 @@ pub fn execute_place_bet(
     env: Env,
     info: MessageInfo,
     result: MarketResult,
+    min_odds: Odd,
     receiver: Option<Addr>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
@@ -29,16 +35,77 @@ pub fn execute_place_bet(
         return Err(ContractError::BetsNotAccepted {});
     }
 
+    let odds: Odd = match result {
+        MarketResult::HOME => market.home_odds,
+        MarketResult::AWAY => market.away_odds,
+    };
+
+    if odds < min_odds {
+        return Err(ContractError::MinimumOddsNotKept {});
+    }
+
     let bet_amount = cw_utils::must_pay(&info, &config.denom);
     if bet_amount.is_err() {
         return Err(ContractError::PaymentError {});
     }
     let bet_amount = bet_amount.unwrap();
 
-    match result {
-        MarketResult::HOME => {}
-        MarketResult::AWAY => {}
+    let payout = bet_amount.multiply_ratio(odds, 1_000_000_u128);
+
+    let market_balance = deps
+        .querier
+        .query_balance(env.contract.address, &config.denom)?
+        .amount;
+    let potential_market_payout = match result {
+        MarketResult::HOME => HOME_TOTAL_PAYOUT.load(deps.storage)?,
+        MarketResult::AWAY => AWAY_TOTAL_PAYOUT.load(deps.storage)?,
     };
+    let available_market_balance = market_balance - potential_market_payout;
+    let max_bet = available_market_balance
+        .checked_div_ceil((odds.into(), 1_000_000_u128))
+        .unwrap()
+        .multiply_ratio(config.max_bet_ratio, 100_u128);
+    if bet_amount > max_bet {
+        return Err(ContractError::MaxBetExceeded {});
+    }
+
+    let previous_bet = match result {
+        MarketResult::HOME => HOME_BETS.may_load(deps.storage, addr.clone())?,
+        MarketResult::AWAY => AWAY_BETS.may_load(deps.storage, addr.clone())?,
+    };
+
+    let mut average_odds = odds;
+    let mut total_bet_amount = bet_amount;
+    if previous_bet.is_some() {
+        let (previous_odds, previous_bet_amount) = previous_bet.unwrap();
+        let previous_payout = previous_bet_amount.multiply_ratio(previous_odds, 1_000_000_u128);
+        let total_payout = payout + previous_payout;
+        total_bet_amount = previous_bet_amount + bet_amount;
+        average_odds = total_bet_amount.multiply_ratio(1_000_000_u128, total_payout);
+    }
+
+    match result {
+        MarketResult::HOME => {
+            HOME_BETS.save(
+                deps.storage,
+                addr.clone(),
+                &(average_odds.into(), total_bet_amount),
+            )?;
+            HOME_TOTAL_PAYOUT
+                .update(deps.storage, |total| -> StdResult<_> { Ok(total + payout) })?
+        }
+        MarketResult::AWAY => {
+            AWAY_BETS.save(
+                deps.storage,
+                addr.clone(),
+                &(average_odds.into(), total_bet_amount),
+            )?;
+            AWAY_TOTAL_PAYOUT
+                .update(deps.storage, |total| -> StdResult<_> { Ok(total + payout) })?
+        }
+    };
+
+    // TODO: Calculate new odds
 
     Ok(Response::new()
         .add_attribute("protocol", "vendetta-markets")
@@ -46,8 +113,10 @@ pub fn execute_place_bet(
         .add_attribute("action", "place_bet")
         .add_attribute("sender", info.sender)
         .add_attribute("receiver", addr)
+        .add_attribute("result", result.to_string())
         .add_attribute("bet_amount", bet_amount.to_string())
-        .add_attribute("result", result.to_string()))
+        .add_attribute("odds", odds.to_string())
+        .add_attribute("potential_payout", payout.to_string()))
 }
 
 pub fn execute_claim_winnings(
@@ -71,15 +140,27 @@ pub fn execute_claim_winnings(
         return Err(ContractError::ClaimAlreadyMade {});
     }
 
-    let payout = 0;
+    let bet = match market.result {
+        Some(MarketResult::HOME) => HOME_BETS.may_load(deps.storage, addr.clone())?,
+        Some(MarketResult::AWAY) => AWAY_BETS.may_load(deps.storage, addr.clone())?,
+        None => None,
+    };
+
+    let mut payout = Uint128::zero();
+    if let Some((odds, bet_amount)) = bet {
+        if market.status == Status::CANCELLED {
+            payout = bet_amount;
+        } else {
+            payout = bet_amount.multiply_ratio(odds, 1_000_000_u128);
+        }
+    }
 
     let mut messages: Vec<CosmosMsg> = vec![];
-
-    if payout > 0 {
+    if payout > Uint128::zero() {
         messages.push(
             BankMsg::Send {
                 to_address: addr.to_string(),
-                amount: vec![coin(payout, config.denom)],
+                amount: vec![coin(payout.into(), config.denom)],
             }
             .into(),
         );
@@ -155,18 +236,23 @@ pub fn execute_score(
     market.result = Some(result.clone());
     MARKET.save(deps.storage, &market)?;
 
-    let mut fee_amount = Uint128::zero();
-    if config.fee_bps > 0 {
-        fee_amount = Uint128::zero();
-    }
+    let market_balance = deps
+        .querier
+        .query_balance(env.contract.address, &config.denom)?
+        .amount;
+    let market_payout = match result {
+        MarketResult::HOME => HOME_TOTAL_PAYOUT.load(deps.storage)?,
+        MarketResult::AWAY => AWAY_TOTAL_PAYOUT.load(deps.storage)?,
+    };
+
+    let fee_collected = market_balance - market_payout;
 
     let mut messages: Vec<CosmosMsg> = vec![];
-
-    if fee_amount > Uint128::zero() {
+    if fee_collected > Uint128::zero() {
         messages.push(
             BankMsg::Send {
                 to_address: config.treasury_addr.to_string(),
-                amount: vec![coin(fee_amount.into(), config.denom)],
+                amount: vec![coin(fee_collected.into(), &config.denom)],
             }
             .into(),
         );
@@ -180,7 +266,7 @@ pub fn execute_score(
         .add_attribute("sender", info.sender)
         .add_attribute("status", Status::CLOSED.to_string())
         .add_attribute("result", result.to_string())
-        .add_attribute("fee_collected", fee_amount))
+        .add_attribute("fee_collected", fee_collected))
 }
 
 pub fn execute_cancel(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {

@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 
@@ -11,7 +11,7 @@ use crate::{
     },
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     queries::{query_bets_by_address, query_config, query_estimate_winnings, query_market},
-    state::{Config, Market, Status, CONFIG, MARKET},
+    state::{Config, Market, Status, AWAY_TOTAL_PAYOUT, CONFIG, HOME_TOTAL_PAYOUT, MARKET},
     ContractError,
 };
 
@@ -42,6 +42,7 @@ pub fn instantiate(
         admin_addr: Addr::unchecked(ADMIN_ADDRESS),
         treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
         fee_bps: msg.fee_bps,
+        max_bet_ratio: msg.max_bet_ratio,
         denom: msg.denom,
     };
     CONFIG.save(deps.storage, &state)?;
@@ -50,12 +51,17 @@ pub fn instantiate(
         id: msg.id,
         label: msg.label,
         home_team: msg.home_team,
+        home_odds: msg.home_odds,
         away_team: msg.away_team,
+        away_odds: msg.away_odds,
         start_timestamp: msg.start_timestamp,
         status: Status::ACTIVE,
         result: None,
     };
     MARKET.save(deps.storage, &market)?;
+
+    HOME_TOTAL_PAYOUT.save(deps.storage, &Uint128::zero())?;
+    AWAY_TOTAL_PAYOUT.save(deps.storage, &Uint128::zero())?;
 
     Ok(Response::new()
         .add_attribute("protocol", "vendetta-markets")
@@ -65,7 +71,9 @@ pub fn instantiate(
         .add_attribute("id", market.id)
         .add_attribute("label", market.label)
         .add_attribute("home_team", market.home_team)
+        .add_attribute("home_odds", market.home_odds.to_string())
         .add_attribute("away_team", market.away_team)
+        .add_attribute("away_odds", market.away_odds.to_string())
         .add_attribute("start_timestamp", market.start_timestamp.to_string())
         .add_attribute("status", Status::ACTIVE.to_string()))
 }
@@ -92,9 +100,11 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::PlaceBet { result, receiver } => {
-            execute_place_bet(deps, env, info, result, receiver)
-        }
+        ExecuteMsg::PlaceBet {
+            result,
+            min_odds,
+            receiver,
+        } => execute_place_bet(deps, env, info, result, min_odds, receiver),
         ExecuteMsg::ClaimWinnings { receiver } => execute_claim_winnings(deps, info, receiver),
         ExecuteMsg::Update { start_timestamp } => execute_update(deps, info, start_timestamp),
         ExecuteMsg::Score { result } => execute_score(deps, env, info, result),
@@ -109,10 +119,11 @@ mod tests {
     use crate::msg::{ConfigResponse, MarketResponse};
 
     use super::*;
-    use cosmwasm_std::from_json;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
+    use cosmwasm_std::{from_json, Uint128};
 
     const NATIVE_DENOM: &str = "denom";
+    const DEFAULT_FEE_BPS: u64 = 250;
 
     #[test]
     fn proper_initialization() {
@@ -125,11 +136,14 @@ mod tests {
             + 60 * 5; // 5 minutes from now
         let msg = InstantiateMsg {
             denom: NATIVE_DENOM.to_string(),
-            fee_bps: 250,
+            fee_bps: DEFAULT_FEE_BPS,
+            max_bet_ratio: 20,
             id: "game-cs2-test-league".to_string(),
             label: "CS2 - Test League - Team A vs Team B".to_string(),
             home_team: "Team A".to_string(),
+            home_odds: Uint128::new(205) * Uint128::from(1_000_000_u128),
             away_team: "Team B".to_string(),
+            away_odds: Uint128::new(185) * Uint128::from(1_000_000_u128),
             start_timestamp,
         };
         let info = message_info(&Addr::unchecked(ADMIN_ADDRESS), &[]);

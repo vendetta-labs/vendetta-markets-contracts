@@ -1,16 +1,19 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
 
-use crate::state::{Config, Market, MarketResult};
+use crate::state::{Config, Market, MarketResult, Odd};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub fee_bps: u64, // Fee in basis points
+    pub fee_bps: u64,       // Fee in basis points
+    pub max_bet_ratio: u64, // Max bet ratio in basis points
     pub denom: String,
     pub id: String,
     pub label: String,
     pub home_team: String,
+    pub home_odds: Odd,
     pub away_team: String,
+    pub away_odds: Odd,
     pub start_timestamp: u64,
 }
 
@@ -18,6 +21,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     PlaceBet {
         result: MarketResult,
+        min_odds: Odd,
         receiver: Option<Addr>,
     },
     ClaimWinnings {
