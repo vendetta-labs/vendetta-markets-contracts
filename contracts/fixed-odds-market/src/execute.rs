@@ -183,10 +183,13 @@ pub fn execute_claim_winnings(
 pub fn execute_update(
     deps: DepsMut,
     info: MessageInfo,
-    start_timestamp: u64,
+    max_bet_ratio: Option<u64>,
+    home_odds: Option<Odd>,
+    away_odds: Option<Odd>,
+    start_timestamp: Option<u64>,
 ) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
-    let market = MARKET.load(deps.storage)?;
+    let mut config = CONFIG.load(deps.storage)?;
+    let mut market = MARKET.load(deps.storage)?;
 
     if info.sender != config.admin_addr {
         return Err(ContractError::Unauthorized {});
@@ -196,8 +199,29 @@ pub fn execute_update(
         return Err(ContractError::MarketNotActive {});
     }
 
-    let mut market = MARKET.load(deps.storage)?;
-    market.start_timestamp = start_timestamp;
+    let mut max_bet_ratio_update = String::default();
+    if let Some(max_bet_ratio) = max_bet_ratio {
+        config.max_bet_ratio = max_bet_ratio;
+        max_bet_ratio_update = max_bet_ratio.to_string();
+    }
+
+    let mut home_odds_update = String::default();
+    if let Some(home_odds) = home_odds {
+        market.home_odds = home_odds;
+        home_odds_update = home_odds.to_string();
+    }
+
+    let mut away_odds_update = String::default();
+    if let Some(away_odds) = away_odds {
+        market.away_odds = away_odds;
+        away_odds_update = away_odds.to_string();
+    }
+
+    let mut start_timestamp_update = String::default();
+    if let Some(start_timestamp) = start_timestamp {
+        market.start_timestamp = start_timestamp;
+        start_timestamp_update = start_timestamp.to_string();
+    }
 
     MARKET.save(deps.storage, &market)?;
 
@@ -206,7 +230,10 @@ pub fn execute_update(
         .add_attribute("market_type", "fixed-odds")
         .add_attribute("action", "update_market")
         .add_attribute("sender", info.sender)
-        .add_attribute("start_timestamp", start_timestamp.to_string()))
+        .add_attribute("max_bet_ratio", max_bet_ratio_update)
+        .add_attribute("home_odds", home_odds_update)
+        .add_attribute("away_odds", away_odds_update)
+        .add_attribute("start_timestamp", start_timestamp_update))
 }
 
 pub fn execute_score(

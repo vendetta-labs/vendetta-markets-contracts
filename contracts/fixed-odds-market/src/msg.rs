@@ -29,7 +29,10 @@ pub enum ExecuteMsg {
     },
     // Admin
     Update {
-        start_timestamp: u64,
+        max_bet_ratio: Option<u64>,
+        home_odds: Option<Odd>,
+        away_odds: Option<Odd>,
+        start_timestamp: Option<u64>,
     },
     Score {
         result: MarketResult,

@@ -106,7 +106,19 @@ pub fn execute(
             receiver,
         } => execute_place_bet(deps, env, info, result, min_odds, receiver),
         ExecuteMsg::ClaimWinnings { receiver } => execute_claim_winnings(deps, info, receiver),
-        ExecuteMsg::Update { start_timestamp } => execute_update(deps, info, start_timestamp),
+        ExecuteMsg::Update {
+            max_bet_ratio,
+            home_odds,
+            away_odds,
+            start_timestamp,
+        } => execute_update(
+            deps,
+            info,
+            max_bet_ratio,
+            home_odds,
+            away_odds,
+            start_timestamp,
+        ),
         ExecuteMsg::Score { result } => execute_score(deps, env, info, result),
         ExecuteMsg::Cancel {} => execute_cancel(deps, info),
     }
