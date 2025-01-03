@@ -5,7 +5,7 @@ mod tests {
     use crate::contract::{ADMIN_ADDRESS, TREASURY_ADDRESS};
     use crate::helpers::CwContract;
     use crate::msg::InstantiateMsg;
-    use cosmwasm_std::{Addr, Coin, Decimal, Empty, Uint128};
+    use cosmwasm_std::{coin, Addr, Coin, Decimal, Empty, Uint128};
     use cw_multi_test::{
         App, AppBuilder, BankKeeper, Contract, ContractWrapper, Executor, MockApiBech32,
     };
@@ -46,6 +46,17 @@ mod tests {
                 >,
                  _,
                  storage| {
+                    router
+                        .bank
+                        .init_balance(
+                            storage,
+                            &Addr::unchecked(ADMIN_ADDRESS),
+                            vec![Coin {
+                                denom: NATIVE_DENOM.to_string(),
+                                amount: Uint128::new(INITIAL_BALANCE),
+                            }],
+                        )
+                        .unwrap();
                     router
                         .bank
                         .init_balance(
@@ -163,7 +174,7 @@ mod tests {
                 cw_template_id,
                 Addr::unchecked(ADMIN_ADDRESS),
                 &msg,
-                &[],
+                &[coin(100_000_000, NATIVE_DENOM)],
                 "test",
                 None,
             )

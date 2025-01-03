@@ -44,6 +44,16 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
+pub struct UpdateParams {
+    pub fee_spread_odds: Option<Decimal>, // Fee spread in percentage points
+    pub max_bet_risk_factor: Option<Decimal>, // Max bet risk factor in multiplier, ex: 1.5x
+    pub seed_liquidity_amplifier: Option<Decimal>, // Seed liquidity amplifier in multiplier, ex: 3x
+    pub initial_home_odds: Option<Decimal>,
+    pub initial_away_odds: Option<Decimal>,
+    pub start_timestamp: Option<u64>,
+}
+
+#[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     #[returns(ConfigResponse)]

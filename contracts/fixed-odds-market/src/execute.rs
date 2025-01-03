@@ -5,6 +5,7 @@ use cosmwasm_std::{
 
 use crate::{
     calculate_odds,
+    msg::UpdateParams,
     state::{
         MarketResult, Status, AWAY_BETS, AWAY_TOTAL_BETS, AWAY_TOTAL_PAYOUT, CLAIMS, CONFIG,
         HOME_BETS, HOME_TOTAL_BETS, HOME_TOTAL_PAYOUT, MARKET,
@@ -58,11 +59,11 @@ pub fn execute_place_bet(
         .querier
         .query_balance(env.contract.address, &config.denom)?
         .amount;
-    let potential_market_payout = match result {
-        MarketResult::HOME => HOME_TOTAL_PAYOUT.load(deps.storage)?,
-        MarketResult::AWAY => AWAY_TOTAL_PAYOUT.load(deps.storage)?,
-    };
-    let available_market_balance = market_balance - potential_market_payout;
+    // let potential_market_payout = match result {
+    //     MarketResult::HOME => HOME_TOTAL_PAYOUT.load(deps.storage)?,
+    //     MarketResult::AWAY => AWAY_TOTAL_PAYOUT.load(deps.storage)?,
+    // };
+    // let available_market_balance = market_balance - potential_market_payout;
     let max_bet = Uint128::from(1_000_000_u128);
     if bet_amount > max_bet {
         return Err(ContractError::MaxBetExceeded {});
@@ -76,10 +77,10 @@ pub fn execute_place_bet(
     let mut average_odds = odds;
     let mut total_bet_amount = bet_amount;
     if previous_bet.is_some() {
-        let (previous_odds, previous_bet_amount) = previous_bet.unwrap();
-        let previous_payout = previous_bet_amount
-            .multiply_ratio(previous_odds.numerator(), previous_odds.denominator());
-        let total_payout = payout + previous_payout;
+        let (_previous_odds, previous_bet_amount) = previous_bet.unwrap();
+        // let previous_payout = previous_bet_amount
+        //     .multiply_ratio(previous_odds.numerator(), previous_odds.denominator());
+        // let total_payout = payout + previous_payout;
         total_bet_amount = previous_bet_amount + bet_amount;
         average_odds = odds;
     }
@@ -89,7 +90,7 @@ pub fn execute_place_bet(
             HOME_BETS.save(
                 deps.storage,
                 addr.clone(),
-                &(average_odds.into(), total_bet_amount),
+                &(average_odds, total_bet_amount),
             )?;
             HOME_TOTAL_PAYOUT
                 .update(deps.storage, |total| -> StdResult<_> { Ok(total + payout) })?;
@@ -101,7 +102,7 @@ pub fn execute_place_bet(
             AWAY_BETS.save(
                 deps.storage,
                 addr.clone(),
-                &(average_odds.into(), total_bet_amount),
+                &(average_odds, total_bet_amount),
             )?;
             AWAY_TOTAL_PAYOUT
                 .update(deps.storage, |total| -> StdResult<_> { Ok(total + payout) })?;
@@ -198,12 +199,7 @@ pub fn execute_claim_winnings(
 pub fn execute_update(
     deps: DepsMut,
     info: MessageInfo,
-    fee_spread_odds: Option<Decimal>,
-    max_bet_risk_factor: Option<Decimal>,
-    seed_liquidity_amplifier: Option<Decimal>,
-    initial_home_odds: Option<Decimal>,
-    initial_away_odds: Option<Decimal>,
-    start_timestamp: Option<u64>,
+    params: UpdateParams,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
     let mut market = MARKET.load(deps.storage)?;
@@ -217,39 +213,39 @@ pub fn execute_update(
     }
 
     let mut fee_spread_odds_update = String::default();
-    if let Some(fee_spread_odds) = fee_spread_odds {
+    if let Some(fee_spread_odds) = params.fee_spread_odds {
         config.fee_spread_odds = fee_spread_odds;
         fee_spread_odds_update = fee_spread_odds.to_string();
     }
 
     let mut max_bet_risk_factor_update = String::default();
-    if let Some(max_bet_risk_factor) = max_bet_risk_factor {
+    if let Some(max_bet_risk_factor) = params.max_bet_risk_factor {
         config.max_bet_risk_factor = max_bet_risk_factor;
         max_bet_risk_factor_update = max_bet_risk_factor.to_string();
     }
 
     let mut seed_liquidity_amplifier_update = String::default();
-    if let Some(seed_liquidity_amplifier) = seed_liquidity_amplifier {
+    if let Some(seed_liquidity_amplifier) = params.seed_liquidity_amplifier {
         config.seed_liquidity_amplifier = seed_liquidity_amplifier;
         seed_liquidity_amplifier_update = seed_liquidity_amplifier.to_string();
     }
 
     let mut initial_home_odds_update = String::default();
-    if let Some(initial_home_odds) = initial_home_odds {
+    if let Some(initial_home_odds) = params.initial_home_odds {
         config.initial_home_odds = initial_home_odds;
         market.home_odds = initial_home_odds;
         initial_home_odds_update = initial_home_odds.to_string();
     }
 
     let mut initial_away_odds_update = String::default();
-    if let Some(initial_away_odds) = initial_away_odds {
+    if let Some(initial_away_odds) = params.initial_away_odds {
         config.initial_away_odds = initial_away_odds;
         market.away_odds = initial_away_odds;
         initial_away_odds_update = initial_away_odds.to_string();
     }
 
     let mut start_timestamp_update = String::default();
-    if let Some(start_timestamp) = start_timestamp {
+    if let Some(start_timestamp) = params.start_timestamp {
         market.start_timestamp = start_timestamp;
         start_timestamp_update = start_timestamp.to_string();
     }

@@ -8,6 +8,8 @@ pub mod msg;
 pub mod queries;
 pub mod state;
 
+use std::cmp::Ordering;
+
 use cosmwasm_std::{Decimal, Uint128};
 use state::Config;
 
@@ -91,10 +93,14 @@ fn truncate_odds(odds: Decimal, decimals: u32) -> Decimal {
     let decimal_places = odds.decimal_places() as i32;
     let decimal_places_difference = decimal_places - 2;
 
-    if decimal_places_difference > 0 {
-        atomics = atomics / Uint128::from(10_u128.pow(decimal_places_difference as u32));
-    } else if decimal_places_difference < 0 {
-        atomics = atomics * Uint128::from(10_u128.pow((decimal_places_difference * -1) as u32));
+    match decimal_places_difference.cmp(&0) {
+        Ordering::Greater => {
+            atomics /= Uint128::from(10_u128.pow(decimal_places_difference as u32));
+        }
+        Ordering::Less => {
+            atomics *= Uint128::from(10_u128.pow((-decimal_places_difference) as u32));
+        }
+        Ordering::Equal => {}
     }
 
     Decimal::from_atomics(atomics, decimals).unwrap()

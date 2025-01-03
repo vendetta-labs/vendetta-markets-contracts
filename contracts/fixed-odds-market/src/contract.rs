@@ -10,7 +10,7 @@ use crate::{
     execute::{
         execute_cancel, execute_claim_winnings, execute_place_bet, execute_score, execute_update,
     },
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UpdateParams},
     queries::{query_bets_by_address, query_config, query_estimate_winnings, query_market},
     state::{
         Config, Market, Status, AWAY_TOTAL_BETS, AWAY_TOTAL_PAYOUT, CONFIG, HOME_TOTAL_BETS,
@@ -139,12 +139,14 @@ pub fn execute(
         } => execute_update(
             deps,
             info,
-            fee_spread_odds,
-            max_bet_risk_factor,
-            seed_liquidity_amplifier,
-            initial_home_odds,
-            initial_away_odds,
-            start_timestamp,
+            UpdateParams {
+                fee_spread_odds,
+                max_bet_risk_factor,
+                seed_liquidity_amplifier,
+                initial_home_odds,
+                initial_away_odds,
+                start_timestamp,
+            },
         ),
         ExecuteMsg::Score { result } => execute_score(deps, env, info, result),
         ExecuteMsg::Cancel {} => execute_cancel(deps, info),
