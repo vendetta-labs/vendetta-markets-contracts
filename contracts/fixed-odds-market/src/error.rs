@@ -12,6 +12,9 @@ pub enum ContractError {
     #[error("Invalid chain prefix: {0}")]
     InvalidChainPrefix(String),
 
+    #[error("Market not initially funded")]
+    MarketNotInitiallyFunded {},
+
     #[error("Market not active")]
     MarketNotActive {},
 

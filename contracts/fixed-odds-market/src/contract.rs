@@ -6,12 +6,16 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 
 use crate::{
+    calculate_odds,
     execute::{
         execute_cancel, execute_claim_winnings, execute_place_bet, execute_score, execute_update,
     },
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     queries::{query_bets_by_address, query_config, query_estimate_winnings, query_market},
-    state::{Config, Market, Status, AWAY_TOTAL_PAYOUT, CONFIG, HOME_TOTAL_PAYOUT, MARKET},
+    state::{
+        Config, Market, Status, AWAY_TOTAL_BETS, AWAY_TOTAL_PAYOUT, CONFIG, HOME_TOTAL_BETS,
+        HOME_TOTAL_PAYOUT, MARKET,
+    },
     ContractError,
 };
 
@@ -32,6 +36,17 @@ pub fn instantiate(
         return Err(ContractError::Unauthorized {});
     }
 
+    let initial_fund = info.funds.first().unwrap();
+    let market_balance = if initial_fund.denom == msg.denom {
+        initial_fund.amount
+    } else {
+        Uint128::zero()
+    };
+
+    if market_balance.is_zero() {
+        return Err(ContractError::MarketNotInitiallyFunded {});
+    }
+
     set_contract_version(
         deps.storage,
         format!("crates.io:{CONTRACT_NAME}"),
@@ -41,27 +56,35 @@ pub fn instantiate(
     let state = Config {
         admin_addr: Addr::unchecked(ADMIN_ADDRESS),
         treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
-        fee_bps: msg.fee_bps,
-        max_bet_ratio: msg.max_bet_ratio,
         denom: msg.denom,
+        fee_spread_odds: msg.fee_spread_odds,
+        max_bet_risk_factor: msg.max_bet_risk_factor,
+        seed_liquidity_amplifier: msg.seed_liquidity_amplifier,
+        initial_home_odds: msg.initial_home_odds,
+        initial_away_odds: msg.initial_away_odds,
     };
     CONFIG.save(deps.storage, &state)?;
+
+    HOME_TOTAL_PAYOUT.save(deps.storage, &Uint128::zero())?;
+    AWAY_TOTAL_PAYOUT.save(deps.storage, &Uint128::zero())?;
+    HOME_TOTAL_BETS.save(deps.storage, &Uint128::zero())?;
+    AWAY_TOTAL_BETS.save(deps.storage, &Uint128::zero())?;
+
+    let (home_odds, away_odds) =
+        calculate_odds(&state, market_balance, Uint128::zero(), Uint128::zero());
 
     let market = Market {
         id: msg.id,
         label: msg.label,
         home_team: msg.home_team,
-        home_odds: msg.home_odds,
+        home_odds,
         away_team: msg.away_team,
-        away_odds: msg.away_odds,
+        away_odds,
         start_timestamp: msg.start_timestamp,
         status: Status::ACTIVE,
         result: None,
     };
     MARKET.save(deps.storage, &market)?;
-
-    HOME_TOTAL_PAYOUT.save(deps.storage, &Uint128::zero())?;
-    AWAY_TOTAL_PAYOUT.save(deps.storage, &Uint128::zero())?;
 
     Ok(Response::new()
         .add_attribute("protocol", "vendetta-markets")
@@ -107,16 +130,20 @@ pub fn execute(
         } => execute_place_bet(deps, env, info, result, min_odds, receiver),
         ExecuteMsg::ClaimWinnings { receiver } => execute_claim_winnings(deps, info, receiver),
         ExecuteMsg::Update {
-            max_bet_ratio,
-            home_odds,
-            away_odds,
+            fee_spread_odds,
+            max_bet_risk_factor,
+            seed_liquidity_amplifier,
+            initial_home_odds,
+            initial_away_odds,
             start_timestamp,
         } => execute_update(
             deps,
             info,
-            max_bet_ratio,
-            home_odds,
-            away_odds,
+            fee_spread_odds,
+            max_bet_risk_factor,
+            seed_liquidity_amplifier,
+            initial_home_odds,
+            initial_away_odds,
             start_timestamp,
         ),
         ExecuteMsg::Score { result } => execute_score(deps, env, info, result),
@@ -132,10 +159,9 @@ mod tests {
 
     use super::*;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
-    use cosmwasm_std::{from_json, Uint128};
+    use cosmwasm_std::{coin, from_json, Decimal};
 
     const NATIVE_DENOM: &str = "denom";
-    const DEFAULT_FEE_BPS: u64 = 250;
 
     #[test]
     fn proper_initialization() {
@@ -148,24 +174,27 @@ mod tests {
             + 60 * 5; // 5 minutes from now
         let msg = InstantiateMsg {
             denom: NATIVE_DENOM.to_string(),
-            fee_bps: DEFAULT_FEE_BPS,
-            max_bet_ratio: 20,
             id: "game-cs2-test-league".to_string(),
             label: "CS2 - Test League - Team A vs Team B".to_string(),
             home_team: "Team A".to_string(),
-            home_odds: Uint128::new(205) * Uint128::from(1_000_000_u128),
             away_team: "Team B".to_string(),
-            away_odds: Uint128::new(185) * Uint128::from(1_000_000_u128),
+            fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+            max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+            seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+            initial_home_odds: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.1
+            initial_away_odds: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
             start_timestamp,
         };
-        let info = message_info(&Addr::unchecked(ADMIN_ADDRESS), &[]);
+        let info = message_info(
+            &Addr::unchecked(ADMIN_ADDRESS),
+            &[coin(1_000, NATIVE_DENOM)],
+        );
 
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         let config_query = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
         let value: ConfigResponse = from_json(&config_query).unwrap();
-        assert_eq!(250, value.config.fee_bps);
         assert_eq!(ADMIN_ADDRESS, value.config.admin_addr.as_str());
         assert_eq!(TREASURY_ADDRESS, value.config.treasury_addr.as_str());
         assert_eq!(NATIVE_DENOM, value.config.denom.as_str());
@@ -179,5 +208,14 @@ mod tests {
         assert_eq!(start_timestamp, value.market.start_timestamp);
         assert_eq!(Status::ACTIVE, value.market.status);
         assert_eq!(None, value.market.result);
+        assert_eq!(
+            Decimal::from_atomics(191_u128, 2).unwrap(),
+            value.market.home_odds
+        );
+        assert_eq!(
+            Decimal::from_atomics(156_u128, 2).unwrap(),
+            value.market.away_odds
+        );
+        println!("{:?}", value.market);
     }
 }

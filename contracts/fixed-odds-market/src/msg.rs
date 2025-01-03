@@ -1,19 +1,20 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Decimal};
 
-use crate::state::{Config, Market, MarketResult, Odd};
+use crate::state::{Config, Market, MarketResult};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub fee_bps: u64,       // Fee in basis points
-    pub max_bet_ratio: u64, // Max bet ratio in basis points
     pub denom: String,
     pub id: String,
     pub label: String,
     pub home_team: String,
-    pub home_odds: Odd,
     pub away_team: String,
-    pub away_odds: Odd,
+    pub fee_spread_odds: Decimal,     // Fee spread in percentage points
+    pub max_bet_risk_factor: Decimal, // Max bet risk factor in multiplier, ex: 1.5x
+    pub seed_liquidity_amplifier: Decimal, // Seed liquidity amplifier in multiplier, ex: 3x
+    pub initial_home_odds: Decimal,
+    pub initial_away_odds: Decimal,
     pub start_timestamp: u64,
 }
 
@@ -21,7 +22,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     PlaceBet {
         result: MarketResult,
-        min_odds: Odd,
+        min_odds: Decimal,
         receiver: Option<Addr>,
     },
     ClaimWinnings {
@@ -29,9 +30,11 @@ pub enum ExecuteMsg {
     },
     // Admin
     Update {
-        max_bet_ratio: Option<u64>,
-        home_odds: Option<Odd>,
-        away_odds: Option<Odd>,
+        fee_spread_odds: Option<Decimal>, // Fee spread in percentage points
+        max_bet_risk_factor: Option<Decimal>, // Max bet risk factor in multiplier, ex: 1.5x
+        seed_liquidity_amplifier: Option<Decimal>, // Seed liquidity amplifier in multiplier, ex: 3x
+        initial_home_odds: Option<Decimal>,
+        initial_away_odds: Option<Decimal>,
         start_timestamp: Option<u64>,
     },
     Score {

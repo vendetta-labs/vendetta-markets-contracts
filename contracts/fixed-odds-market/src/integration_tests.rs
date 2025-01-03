@@ -5,7 +5,7 @@ mod tests {
     use crate::contract::{ADMIN_ADDRESS, TREASURY_ADDRESS};
     use crate::helpers::CwContract;
     use crate::msg::InstantiateMsg;
-    use cosmwasm_std::{Addr, Coin, Empty, Uint128};
+    use cosmwasm_std::{Addr, Coin, Decimal, Empty, Uint128};
     use cw_multi_test::{
         App, AppBuilder, BankKeeper, Contract, ContractWrapper, Executor, MockApiBech32,
     };
@@ -24,7 +24,6 @@ mod tests {
     const USER_A: &str = "USER_A";
     const USER_B: &str = "USER_B";
     const USER_C: &str = "USER_C";
-    const DEFAULT_FEE_BPS: u64 = 250;
     const INITIAL_BALANCE: u128 = 1_000_000_000;
 
     fn proper_instantiate() -> (App<BankKeeper, MockApiBech32>, CwContract) {
@@ -144,14 +143,15 @@ mod tests {
 
         let msg = InstantiateMsg {
             denom: NATIVE_DENOM.to_string(),
-            fee_bps: DEFAULT_FEE_BPS,
-            max_bet_ratio: 20,
             id: "game-cs2-test-league".to_string(),
             label: "CS2 - Test League - Team A vs Team B".to_string(),
             home_team: "Team A".to_string(),
-            home_odds: Uint128::new(205) * Uint128::from(1_000_000_u128),
             away_team: "Team B".to_string(),
-            away_odds: Uint128::new(185) * Uint128::from(1_000_000_u128),
+            fee_spread_odds: Decimal::from_atomics(1_u128, 1).unwrap(), // 0.1
+            max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+            seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+            initial_home_odds: Decimal::from_atomics(21_u128, 1).unwrap(), // 2.1
+            initial_away_odds: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
             start_timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards")
