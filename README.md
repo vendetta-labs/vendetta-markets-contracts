@@ -11,7 +11,7 @@ This repository contains the source code for the core smart contracts of Vendett
 ### Run tests
 
 ```bash
-cargo all-tests
+cargo test
 ```
 ## How to deploy
 

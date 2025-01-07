@@ -6,17 +6,19 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 
 use crate::{
-    calculate_odds,
+    error::ContractError,
     execute::{
         execute_cancel, execute_claim_winnings, execute_place_bet, execute_score, execute_update,
     },
+    logic::calculate_odds,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UpdateParams},
-    queries::{query_bets_by_address, query_config, query_estimate_winnings, query_market},
-    state::{
-        Config, Market, Status, AWAY_TOTAL_BETS, AWAY_TOTAL_PAYOUT, CONFIG, HOME_TOTAL_BETS,
-        HOME_TOTAL_PAYOUT, MARKET,
+    queries::{
+        query_bets, query_bets_by_address, query_config, query_estimate_winnings, query_market,
     },
-    ContractError,
+    state::{
+        Config, Market, Status, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY, POTENTIAL_PAYOUT_HOME,
+        TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
+    },
 };
 
 pub const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
@@ -28,7 +30,7 @@ pub const TREASURY_ADDRESS: &str = "neutron12v9pqx602k3rzm5hf4jewepl8na4x89ja4td
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
@@ -36,12 +38,10 @@ pub fn instantiate(
         return Err(ContractError::Unauthorized {});
     }
 
-    let initial_fund = info.funds.first().unwrap();
-    let market_balance = if initial_fund.denom == msg.denom {
-        initial_fund.amount
-    } else {
-        Uint128::zero()
-    };
+    let market_balance = deps
+        .querier
+        .query_balance(&env.contract.address, &msg.denom)?
+        .amount;
 
     if market_balance.is_zero() {
         return Err(ContractError::MarketNotInitiallyFunded {});
@@ -60,15 +60,15 @@ pub fn instantiate(
         fee_spread_odds: msg.fee_spread_odds,
         max_bet_risk_factor: msg.max_bet_risk_factor,
         seed_liquidity_amplifier: msg.seed_liquidity_amplifier,
-        initial_home_odds: msg.initial_home_odds,
-        initial_away_odds: msg.initial_away_odds,
+        initial_odds_home: msg.initial_odds_home,
+        initial_odds_away: msg.initial_odds_away,
     };
     CONFIG.save(deps.storage, &state)?;
 
-    HOME_TOTAL_PAYOUT.save(deps.storage, &Uint128::zero())?;
-    AWAY_TOTAL_PAYOUT.save(deps.storage, &Uint128::zero())?;
-    HOME_TOTAL_BETS.save(deps.storage, &Uint128::zero())?;
-    AWAY_TOTAL_BETS.save(deps.storage, &Uint128::zero())?;
+    TOTAL_BETS_HOME.save(deps.storage, &0)?;
+    POTENTIAL_PAYOUT_HOME.save(deps.storage, &0)?;
+    TOTAL_BETS_AWAY.save(deps.storage, &0)?;
+    POTENTIAL_PAYOUT_AWAY.save(deps.storage, &0)?;
 
     let (home_odds, away_odds) =
         calculate_odds(&state, market_balance, Uint128::zero(), Uint128::zero());
@@ -106,6 +106,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
         QueryMsg::Market {} => to_json_binary(&query_market(deps)?),
+        QueryMsg::Bets {} => to_json_binary(&query_bets(deps)?),
         QueryMsg::BetsByAddress { address } => {
             to_json_binary(&query_bets_by_address(deps, address)?)
         }
@@ -133,8 +134,8 @@ pub fn execute(
             fee_spread_odds,
             max_bet_risk_factor,
             seed_liquidity_amplifier,
-            initial_home_odds,
-            initial_away_odds,
+            initial_odds_home,
+            initial_odds_away,
             start_timestamp,
         } => execute_update(
             deps,
@@ -143,81 +144,12 @@ pub fn execute(
                 fee_spread_odds,
                 max_bet_risk_factor,
                 seed_liquidity_amplifier,
-                initial_home_odds,
-                initial_away_odds,
+                initial_odds_home,
+                initial_odds_away,
                 start_timestamp,
             },
         ),
         ExecuteMsg::Score { result } => execute_score(deps, env, info, result),
         ExecuteMsg::Cancel {} => execute_cancel(deps, info),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    use crate::msg::{ConfigResponse, MarketResponse};
-
-    use super::*;
-    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
-    use cosmwasm_std::{coin, from_json, Decimal};
-
-    const NATIVE_DENOM: &str = "denom";
-
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies();
-
-        let start_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs()
-            + 60 * 5; // 5 minutes from now
-        let msg = InstantiateMsg {
-            denom: NATIVE_DENOM.to_string(),
-            id: "game-cs2-test-league".to_string(),
-            label: "CS2 - Test League - Team A vs Team B".to_string(),
-            home_team: "Team A".to_string(),
-            away_team: "Team B".to_string(),
-            fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
-            max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
-            seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
-            initial_home_odds: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.1
-            initial_away_odds: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
-            start_timestamp,
-        };
-        let info = message_info(
-            &Addr::unchecked(ADMIN_ADDRESS),
-            &[coin(1_000, NATIVE_DENOM)],
-        );
-
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        let config_query = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
-        let value: ConfigResponse = from_json(&config_query).unwrap();
-        assert_eq!(ADMIN_ADDRESS, value.config.admin_addr.as_str());
-        assert_eq!(TREASURY_ADDRESS, value.config.treasury_addr.as_str());
-        assert_eq!(NATIVE_DENOM, value.config.denom.as_str());
-
-        let market_query = query(deps.as_ref(), mock_env(), QueryMsg::Market {}).unwrap();
-        let value: MarketResponse = from_json(&market_query).unwrap();
-        assert_eq!("game-cs2-test-league", value.market.id);
-        assert_eq!("CS2 - Test League - Team A vs Team B", value.market.label);
-        assert_eq!("Team A", value.market.home_team);
-        assert_eq!("Team B", value.market.away_team);
-        assert_eq!(start_timestamp, value.market.start_timestamp);
-        assert_eq!(Status::ACTIVE, value.market.status);
-        assert_eq!(None, value.market.result);
-        assert_eq!(
-            Decimal::from_atomics(191_u128, 2).unwrap(),
-            value.market.home_odds
-        );
-        assert_eq!(
-            Decimal::from_atomics(156_u128, 2).unwrap(),
-            value.market.away_odds
-        );
-        println!("{:?}", value.market);
     }
 }

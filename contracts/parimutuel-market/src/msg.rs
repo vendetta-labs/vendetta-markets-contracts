@@ -1,10 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
 
-use crate::{
-    state::{Config, Market, MarketResult},
-    TotalBets,
-};
+use crate::state::{Config, Market, MarketResult};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -60,6 +57,13 @@ pub struct ConfigResponse {
 #[cw_serde]
 pub struct MarketResponse {
     pub market: Market,
+}
+
+#[cw_serde]
+pub struct TotalBets {
+    pub home: u128,
+    pub away: u128,
+    pub draw: u128,
 }
 
 #[cw_serde]

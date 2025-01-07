@@ -1,16 +1,15 @@
 use cosmwasm_std::{Addr, Deps, StdResult};
 
 use crate::{
-    calculate_parimutuel_winnings,
+    logic::calculate_parimutuel_winnings,
     msg::{
         BetsByAddressResponse, BetsResponse, ConfigResponse, EstimateWinningsResponse,
-        MarketResponse,
+        MarketResponse, TotalBets,
     },
     state::{
         MarketResult, CONFIG, MARKET, POOL_AWAY, POOL_DRAW, POOL_HOME, TOTAL_AWAY, TOTAL_DRAW,
         TOTAL_HOME,
     },
-    TotalBets,
 };
 
 /// Returns the current config of the market
@@ -31,9 +30,9 @@ pub fn query_market(deps: Deps) -> StdResult<MarketResponse> {
 /// TOTAL_HOME, TOTAL_AWAY, TOTAL_DRAW
 pub fn query_bets(deps: Deps) -> StdResult<BetsResponse> {
     let totals = TotalBets {
-        total_home: TOTAL_HOME.load(deps.storage)?,
-        total_away: TOTAL_AWAY.load(deps.storage)?,
-        total_draw: TOTAL_DRAW.load(deps.storage)?,
+        home: TOTAL_HOME.load(deps.storage)?,
+        away: TOTAL_AWAY.load(deps.storage)?,
+        draw: TOTAL_DRAW.load(deps.storage)?,
     };
     Ok(BetsResponse { totals })
 }
@@ -62,9 +61,9 @@ pub fn query_bets_by_address(deps: Deps, address: Addr) -> StdResult<BetsByAddre
     };
 
     let totals = TotalBets {
-        total_home,
-        total_away,
-        total_draw,
+        home: total_home,
+        away: total_away,
+        draw: total_draw,
     };
 
     Ok(BetsByAddressResponse { address, totals })

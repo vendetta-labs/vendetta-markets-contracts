@@ -13,8 +13,8 @@ pub struct InstantiateMsg {
     pub fee_spread_odds: Decimal,     // Fee spread in percentage points
     pub max_bet_risk_factor: Decimal, // Max bet risk factor in multiplier, ex: 1.5x
     pub seed_liquidity_amplifier: Decimal, // Seed liquidity amplifier in multiplier, ex: 3x
-    pub initial_home_odds: Decimal,
-    pub initial_away_odds: Decimal,
+    pub initial_odds_home: Decimal,
+    pub initial_odds_away: Decimal,
     pub start_timestamp: u64,
 }
 
@@ -33,8 +33,8 @@ pub enum ExecuteMsg {
         fee_spread_odds: Option<Decimal>, // Fee spread in percentage points
         max_bet_risk_factor: Option<Decimal>, // Max bet risk factor in multiplier, ex: 1.5x
         seed_liquidity_amplifier: Option<Decimal>, // Seed liquidity amplifier in multiplier, ex: 3x
-        initial_home_odds: Option<Decimal>,
-        initial_away_odds: Option<Decimal>,
+        initial_odds_home: Option<Decimal>,
+        initial_odds_away: Option<Decimal>,
         start_timestamp: Option<u64>,
     },
     Score {
@@ -48,8 +48,8 @@ pub struct UpdateParams {
     pub fee_spread_odds: Option<Decimal>, // Fee spread in percentage points
     pub max_bet_risk_factor: Option<Decimal>, // Max bet risk factor in multiplier, ex: 1.5x
     pub seed_liquidity_amplifier: Option<Decimal>, // Seed liquidity amplifier in multiplier, ex: 3x
-    pub initial_home_odds: Option<Decimal>,
-    pub initial_away_odds: Option<Decimal>,
+    pub initial_odds_home: Option<Decimal>,
+    pub initial_odds_away: Option<Decimal>,
     pub start_timestamp: Option<u64>,
 }
 
@@ -60,6 +60,8 @@ pub enum QueryMsg {
     Config {},
     #[returns(MarketResponse)]
     Market {},
+    #[returns(BetsResponse)]
+    Bets {},
     #[returns(BetsByAddressResponse)]
     BetsByAddress { address: Addr },
     #[returns(EstimateWinningsResponse)]
@@ -77,8 +79,28 @@ pub struct MarketResponse {
 }
 
 #[cw_serde]
+pub struct TotalBets {
+    pub home: u128,
+    pub away: u128,
+}
+
+#[cw_serde]
+pub struct PotentialPayouts {
+    pub home: u128,
+    pub away: u128,
+}
+
+#[cw_serde]
+pub struct BetsResponse {
+    pub totals: TotalBets,
+    pub potential_payouts: PotentialPayouts,
+}
+
+#[cw_serde]
 pub struct BetsByAddressResponse {
     pub address: Addr,
+    pub totals: TotalBets,
+    pub potential_payouts: PotentialPayouts,
 }
 
 #[cw_serde]

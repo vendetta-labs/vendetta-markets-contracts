@@ -4,13 +4,13 @@ use cosmwasm_std::{
 };
 
 use crate::{
-    calculate_odds,
+    error::ContractError,
+    logic::calculate_odds,
     msg::UpdateParams,
     state::{
-        MarketResult, Status, AWAY_BETS, AWAY_TOTAL_BETS, AWAY_TOTAL_PAYOUT, CLAIMS, CONFIG,
-        HOME_BETS, HOME_TOTAL_BETS, HOME_TOTAL_PAYOUT, MARKET,
+        MarketResult, Status, ADDR_BETS_AWAY, ADDR_BETS_HOME, CLAIMS, CONFIG, MARKET,
+        POTENTIAL_PAYOUT_AWAY, POTENTIAL_PAYOUT_HOME, TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
     },
-    ContractError,
 };
 
 pub fn execute_place_bet(
@@ -64,14 +64,14 @@ pub fn execute_place_bet(
     //     MarketResult::AWAY => AWAY_TOTAL_PAYOUT.load(deps.storage)?,
     // };
     // let available_market_balance = market_balance - potential_market_payout;
-    let max_bet = Uint128::from(1_000_000_u128);
+    let max_bet = Uint128::from(1_000_000_000_u128);
     if bet_amount > max_bet {
         return Err(ContractError::MaxBetExceeded {});
     }
 
     let previous_bet = match result {
-        MarketResult::HOME => HOME_BETS.may_load(deps.storage, addr.clone())?,
-        MarketResult::AWAY => AWAY_BETS.may_load(deps.storage, addr.clone())?,
+        MarketResult::HOME => ADDR_BETS_HOME.may_load(deps.storage, addr.clone())?,
+        MarketResult::AWAY => ADDR_BETS_AWAY.may_load(deps.storage, addr.clone())?,
     };
 
     let mut average_odds = odds;
@@ -81,42 +81,48 @@ pub fn execute_place_bet(
         // let previous_payout = previous_bet_amount
         //     .multiply_ratio(previous_odds.numerator(), previous_odds.denominator());
         // let total_payout = payout + previous_payout;
-        total_bet_amount = previous_bet_amount + bet_amount;
+        total_bet_amount = Uint128::from(previous_bet_amount) + bet_amount;
         average_odds = odds;
     }
 
     match result {
         MarketResult::HOME => {
-            HOME_BETS.save(
+            TOTAL_BETS_HOME.update(deps.storage, |total| -> StdResult<_> {
+                Ok((Uint128::from(total) + bet_amount).into())
+            })?;
+            ADDR_BETS_HOME.save(
                 deps.storage,
                 addr.clone(),
-                &(average_odds, total_bet_amount),
+                &(average_odds, total_bet_amount.into()),
             )?;
-            HOME_TOTAL_PAYOUT
-                .update(deps.storage, |total| -> StdResult<_> { Ok(total + payout) })?;
-            HOME_TOTAL_BETS.update(deps.storage, |total| -> StdResult<_> {
-                Ok(total + bet_amount)
+            POTENTIAL_PAYOUT_HOME.update(deps.storage, |total| -> StdResult<_> {
+                Ok((Uint128::from(total) + payout).into())
             })?;
         }
         MarketResult::AWAY => {
-            AWAY_BETS.save(
+            TOTAL_BETS_AWAY.update(deps.storage, |total| -> StdResult<_> {
+                Ok((Uint128::from(total) + bet_amount).into())
+            })?;
+            ADDR_BETS_AWAY.save(
                 deps.storage,
                 addr.clone(),
-                &(average_odds, total_bet_amount),
+                &(average_odds, total_bet_amount.into()),
             )?;
-            AWAY_TOTAL_PAYOUT
-                .update(deps.storage, |total| -> StdResult<_> { Ok(total + payout) })?;
-            AWAY_TOTAL_BETS.update(deps.storage, |total| -> StdResult<_> {
-                Ok(total + bet_amount)
+            POTENTIAL_PAYOUT_AWAY.update(deps.storage, |total| -> StdResult<_> {
+                Ok((Uint128::from(total) + payout).into())
             })?;
         }
     };
 
-    let home_total_bets = HOME_TOTAL_BETS.load(deps.storage)?;
-    let away_total_bets = AWAY_TOTAL_BETS.load(deps.storage)?;
+    let home_total_bets = TOTAL_BETS_HOME.load(deps.storage)?;
+    let away_total_bets = TOTAL_BETS_AWAY.load(deps.storage)?;
 
-    let (new_home_odds, new_away_odds) =
-        calculate_odds(&config, market_balance, home_total_bets, away_total_bets);
+    let (new_home_odds, new_away_odds) = calculate_odds(
+        &config,
+        market_balance,
+        Uint128::from(home_total_bets),
+        Uint128::from(away_total_bets),
+    );
     market.home_odds = new_home_odds;
     market.away_odds = new_away_odds;
     MARKET.save(deps.storage, &market)?;
@@ -157,26 +163,28 @@ pub fn execute_claim_winnings(
     }
 
     let bet = match market.result {
-        Some(MarketResult::HOME) => HOME_BETS.may_load(deps.storage, addr.clone())?,
-        Some(MarketResult::AWAY) => AWAY_BETS.may_load(deps.storage, addr.clone())?,
+        Some(MarketResult::HOME) => ADDR_BETS_HOME.may_load(deps.storage, addr.clone())?,
+        Some(MarketResult::AWAY) => ADDR_BETS_AWAY.may_load(deps.storage, addr.clone())?,
         None => None,
     };
 
-    let mut payout = Uint128::zero();
+    let mut payout = 0;
     if let Some((odds, bet_amount)) = bet {
         if market.status == Status::CANCELLED {
             payout = bet_amount;
         } else {
-            payout = bet_amount.multiply_ratio(odds.numerator(), odds.denominator());
+            payout = Uint128::from(bet_amount)
+                .multiply_ratio(odds.numerator(), odds.denominator())
+                .into();
         }
     }
 
     let mut messages: Vec<CosmosMsg> = vec![];
-    if payout > Uint128::zero() {
+    if payout > 0 {
         messages.push(
             BankMsg::Send {
                 to_address: addr.to_string(),
-                amount: vec![coin(payout.into(), config.denom)],
+                amount: vec![coin(payout, config.denom)],
             }
             .into(),
         );
@@ -230,18 +238,18 @@ pub fn execute_update(
         seed_liquidity_amplifier_update = seed_liquidity_amplifier.to_string();
     }
 
-    let mut initial_home_odds_update = String::default();
-    if let Some(initial_home_odds) = params.initial_home_odds {
-        config.initial_home_odds = initial_home_odds;
-        market.home_odds = initial_home_odds;
-        initial_home_odds_update = initial_home_odds.to_string();
+    let mut initial_odds_home_update = String::default();
+    if let Some(initial_odds_home) = params.initial_odds_home {
+        config.initial_odds_home = initial_odds_home;
+        market.home_odds = initial_odds_home;
+        initial_odds_home_update = initial_odds_home.to_string();
     }
 
-    let mut initial_away_odds_update = String::default();
-    if let Some(initial_away_odds) = params.initial_away_odds {
-        config.initial_away_odds = initial_away_odds;
-        market.away_odds = initial_away_odds;
-        initial_away_odds_update = initial_away_odds.to_string();
+    let mut initial_odds_away_update = String::default();
+    if let Some(initial_odds_away) = params.initial_odds_away {
+        config.initial_odds_away = initial_odds_away;
+        market.away_odds = initial_odds_away;
+        initial_odds_away_update = initial_odds_away.to_string();
     }
 
     let mut start_timestamp_update = String::default();
@@ -260,8 +268,8 @@ pub fn execute_update(
         .add_attribute("fee_spread_odds", fee_spread_odds_update)
         .add_attribute("max_bet_risk_factor", max_bet_risk_factor_update)
         .add_attribute("seed_liquidity_amplifier", seed_liquidity_amplifier_update)
-        .add_attribute("initial_home_odds", initial_home_odds_update)
-        .add_attribute("initial_away_odds", initial_away_odds_update)
+        .add_attribute("initial_odds_home", initial_odds_home_update)
+        .add_attribute("initial_odds_away", initial_odds_away_update)
         .add_attribute("start_timestamp", start_timestamp_update))
 }
 
@@ -294,14 +302,18 @@ pub fn execute_score(
 
     let market_balance = deps
         .querier
-        .query_balance(env.contract.address, &config.denom)?
+        .query_balance(&env.contract.address, &config.denom)?
         .amount;
     let market_payout = match result {
-        MarketResult::HOME => HOME_TOTAL_PAYOUT.load(deps.storage)?,
-        MarketResult::AWAY => AWAY_TOTAL_PAYOUT.load(deps.storage)?,
+        MarketResult::HOME => POTENTIAL_PAYOUT_HOME.load(deps.storage)?,
+        MarketResult::AWAY => POTENTIAL_PAYOUT_AWAY.load(deps.storage)?,
     };
 
-    let fee_collected = market_balance - market_payout;
+    let fee_collected = market_balance - Uint128::from(market_payout);
+    println!("addy: {:?}", &env.contract.address);
+    println!("denom: {:?}", &config.denom);
+    println!("market_balance: {:?}", market_balance);
+    println!("fee collected: {:?}", fee_collected);
 
     let mut messages: Vec<CosmosMsg> = vec![];
     if fee_collected > Uint128::zero() {

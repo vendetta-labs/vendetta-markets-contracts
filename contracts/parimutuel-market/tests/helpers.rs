@@ -1,9 +1,11 @@
+use cosmwasm_std::{to_json_binary, Addr, Coin, CosmosMsg, Empty, StdResult, WasmMsg};
+use cw_multi_test::{Contract, ContractWrapper};
+use parimutuel_market::{
+    contract::{execute, instantiate, query},
+    msg::ExecuteMsg,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-use cosmwasm_std::{to_json_binary, Addr, Coin, CosmosMsg, StdResult, WasmMsg};
-
-use crate::msg::ExecuteMsg;
 
 /// CwContract is a wrapper around Addr that provides a lot of helpers
 /// for working with this contract.
@@ -24,4 +26,9 @@ impl CwContract {
         }
         .into())
     }
+}
+
+pub fn contract_template() -> Box<dyn Contract<Empty>> {
+    let contract = ContractWrapper::new(execute, instantiate, query);
+    Box::new(contract)
 }
