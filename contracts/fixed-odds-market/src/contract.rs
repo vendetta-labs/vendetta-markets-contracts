@@ -54,7 +54,7 @@ pub fn instantiate(
     let state = Config {
         admin_addr: Addr::unchecked(ADMIN_ADDRESS),
         treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
-        denom: msg.denom,
+        denom: msg.denom.clone(),
         fee_spread_odds: msg.fee_spread_odds,
         max_bet_risk_factor: msg.max_bet_risk_factor,
         seed_liquidity_amplifier: msg.seed_liquidity_amplifier,
@@ -89,6 +89,17 @@ pub fn instantiate(
         .add_attribute("market_type", "fixed-odds")
         .add_attribute("action", "create_market")
         .add_attribute("sender", info.sender)
+        .add_attribute("admin_addr", ADMIN_ADDRESS)
+        .add_attribute("treasury_addr", TREASURY_ADDRESS)
+        .add_attribute("denom", msg.denom)
+        .add_attribute("fee_spread_odds", msg.fee_spread_odds.to_string())
+        .add_attribute("max_bet_risk_factor", msg.max_bet_risk_factor.to_string())
+        .add_attribute(
+            "seed_liquidity_amplifier",
+            msg.seed_liquidity_amplifier.to_string(),
+        )
+        .add_attribute("initial_odds_home", msg.initial_odds_home.to_string())
+        .add_attribute("initial_odds_away", msg.initial_odds_away.to_string())
         .add_attribute("id", market.id)
         .add_attribute("label", market.label)
         .add_attribute("home_team", market.home_team)

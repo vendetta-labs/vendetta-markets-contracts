@@ -44,7 +44,7 @@ pub fn instantiate(
         admin_addr: Addr::unchecked(ADMIN_ADDRESS),
         treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
         fee_bps: msg.fee_bps,
-        denom: msg.denom,
+        denom: msg.denom.clone(),
     };
     CONFIG.save(deps.storage, &state)?;
 
@@ -69,6 +69,10 @@ pub fn instantiate(
         .add_attribute("market_type", "parimutuel")
         .add_attribute("action", "create_market")
         .add_attribute("sender", info.sender)
+        .add_attribute("admin_addr", ADMIN_ADDRESS)
+        .add_attribute("treasury_addr", TREASURY_ADDRESS)
+        .add_attribute("denom", msg.denom)
+        .add_attribute("fee_bps", msg.fee_bps.to_string())
         .add_attribute("id", market.id)
         .add_attribute("label", market.label)
         .add_attribute("home_team", market.home_team)
