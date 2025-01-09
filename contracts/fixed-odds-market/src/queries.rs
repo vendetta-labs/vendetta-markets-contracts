@@ -1,13 +1,13 @@
-use cosmwasm_std::{Addr, Deps, StdResult};
+use cosmwasm_std::{Addr, Decimal, Deps, StdResult};
 
 use crate::{
     msg::{
-        BetsByAddressResponse, BetsResponse, ConfigResponse, EstimateWinningsResponse,
-        MarketResponse, PotentialPayouts, TotalBets,
+        AllBets, BetsByAddressResponse, BetsResponse, ConfigResponse, MarketResponse,
+        PotentialPayouts, TotalAmounts,
     },
     state::{
-        MarketResult, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY, POTENTIAL_PAYOUT_HOME,
-        TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
+        ADDR_BETS_AWAY, ADDR_BETS_HOME, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY,
+        POTENTIAL_PAYOUT_HOME, TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
     },
 };
 
@@ -23,9 +23,9 @@ pub fn query_market(deps: Deps) -> StdResult<MarketResponse> {
     Ok(MarketResponse { market })
 }
 
-/// Returns the total bets of the market
+/// Returns the total bets and potential payouts of the market
 pub fn query_bets(deps: Deps) -> StdResult<BetsResponse> {
-    let totals = TotalBets {
+    let total_amounts = TotalAmounts {
         home: TOTAL_BETS_HOME.load(deps.storage)?,
         away: TOTAL_BETS_AWAY.load(deps.storage)?,
     };
@@ -36,27 +36,25 @@ pub fn query_bets(deps: Deps) -> StdResult<BetsResponse> {
     };
 
     Ok(BetsResponse {
-        totals,
+        total_amounts,
         potential_payouts,
     })
 }
 
-/// Retruns the total bets for a specific address
-pub fn query_bets_by_address(_deps: Deps, address: Addr) -> StdResult<BetsByAddressResponse> {
+/// Retruns the average bets and potential payouts for a specific address
+pub fn query_bets_by_address(deps: Deps, address: Addr) -> StdResult<BetsByAddressResponse> {
+    let all_bets = AllBets {
+        home: ADDR_BETS_HOME
+            .may_load(deps.storage, address.clone())?
+            .unwrap_or((Decimal::zero(), 0)),
+        away: ADDR_BETS_AWAY
+            .may_load(deps.storage, address.clone())?
+            .unwrap_or((Decimal::zero(), 0)),
+    };
+
     Ok(BetsByAddressResponse {
         address,
-        totals: TotalBets { home: 0, away: 0 },
+        all_bets,
         potential_payouts: PotentialPayouts { home: 0, away: 0 },
     })
-}
-
-/// Returns the estimated winnings for a specific address and result
-pub fn query_estimate_winnings(
-    _deps: Deps,
-    _address: Addr,
-    _result: MarketResult,
-) -> StdResult<EstimateWinningsResponse> {
-    let estimate = 0;
-
-    Ok(EstimateWinningsResponse { estimate })
 }

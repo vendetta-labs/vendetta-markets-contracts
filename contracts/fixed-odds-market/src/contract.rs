@@ -12,9 +12,7 @@ use crate::{
     },
     logic::calculate_odds,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UpdateParams},
-    queries::{
-        query_bets, query_bets_by_address, query_config, query_estimate_winnings, query_market,
-    },
+    queries::{query_bets, query_bets_by_address, query_config, query_market},
     state::{
         Config, Market, Status, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY, POTENTIAL_PAYOUT_HOME,
         TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
@@ -110,9 +108,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::BetsByAddress { address } => {
             to_json_binary(&query_bets_by_address(deps, address)?)
         }
-        QueryMsg::EstimateWinnings { address, result } => {
-            to_json_binary(&query_estimate_winnings(deps, address, result)?)
-        }
     }
 }
 
@@ -139,6 +134,7 @@ pub fn execute(
             start_timestamp,
         } => execute_update(
             deps,
+            env,
             info,
             UpdateParams {
                 fee_spread_odds,

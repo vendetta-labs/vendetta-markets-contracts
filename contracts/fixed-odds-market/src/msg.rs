@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal};
 
-use crate::state::{Config, Market, MarketResult};
+use crate::state::{Bet, BetAmount, Config, Market, MarketResult};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -64,8 +64,6 @@ pub enum QueryMsg {
     Bets {},
     #[returns(BetsByAddressResponse)]
     BetsByAddress { address: Addr },
-    #[returns(EstimateWinningsResponse)]
-    EstimateWinnings { address: Addr, result: MarketResult },
 }
 
 #[cw_serde]
@@ -79,9 +77,9 @@ pub struct MarketResponse {
 }
 
 #[cw_serde]
-pub struct TotalBets {
-    pub home: u128,
-    pub away: u128,
+pub struct TotalAmounts {
+    pub home: BetAmount,
+    pub away: BetAmount,
 }
 
 #[cw_serde]
@@ -92,18 +90,19 @@ pub struct PotentialPayouts {
 
 #[cw_serde]
 pub struct BetsResponse {
-    pub totals: TotalBets,
+    pub total_amounts: TotalAmounts,
     pub potential_payouts: PotentialPayouts,
+}
+
+#[cw_serde]
+pub struct AllBets {
+    pub home: Bet,
+    pub away: Bet,
 }
 
 #[cw_serde]
 pub struct BetsByAddressResponse {
     pub address: Addr,
-    pub totals: TotalBets,
+    pub all_bets: AllBets,
     pub potential_payouts: PotentialPayouts,
-}
-
-#[cw_serde]
-pub struct EstimateWinningsResponse {
-    pub estimate: u128,
 }

@@ -1,9 +1,16 @@
-use cosmwasm_std::{Addr, Coin, StdResult};
-use cw_multi_test::{App, AppBuilder, BankKeeper, ContractWrapper, Executor, MockApiBech32};
+use cosmwasm_std::{Addr, Coin, Decimal, StdResult};
+use cw_multi_test::{
+    error::AnyResult, App, AppBuilder, AppResponse, BankKeeper, ContractWrapper, Executor,
+    MockApiBech32,
+};
 use derivative::Derivative;
 use fixed_odds_market::{
     contract::{execute, instantiate, query},
-    msg::{ConfigResponse, InstantiateMsg, MarketResponse, QueryMsg},
+    msg::{
+        BetsByAddressResponse, BetsResponse, ConfigResponse, ExecuteMsg, InstantiateMsg,
+        MarketResponse, QueryMsg, UpdateParams,
+    },
+    state::MarketResult,
 };
 
 /// BlockchainContract is a wrapper around blockchain App and contract Addr
@@ -33,15 +40,83 @@ impl BlockchainContract {
             .query_wasm_smart(self.addr(), &QueryMsg::Market {})
     }
 
-    // pub fn call<T: Into<ExecuteMsg>>(&self, msg: T, funds: Vec<Coin>) -> StdResult<CosmosMsg> {
-    //     let msg = to_json_binary(&msg.into())?;
-    //     Ok(WasmMsg::Execute {
-    //         contract_addr: self.addr().into(),
-    //         msg,
-    //         funds,
-    //     }
-    //     .into())
-    // }
+    pub fn query_bets(&self) -> StdResult<BetsResponse> {
+        self.blockchain
+            .wrap()
+            .query_wasm_smart(self.addr(), &QueryMsg::Bets {})
+    }
+
+    pub fn query_bets_by_address(&self, address: &Addr) -> StdResult<BetsByAddressResponse> {
+        self.blockchain.wrap().query_wasm_smart(
+            self.addr(),
+            &QueryMsg::BetsByAddress {
+                address: address.clone(),
+            },
+        )
+    }
+
+    pub fn cancel_market(&mut self, sender: &Addr) -> AnyResult<AppResponse> {
+        self.blockchain
+            .execute_contract(sender.clone(), self.addr(), &ExecuteMsg::Cancel {}, &[])
+    }
+
+    pub fn update_market(&mut self, sender: &Addr, params: UpdateParams) -> AnyResult<AppResponse> {
+        self.blockchain.execute_contract(
+            sender.clone(),
+            self.addr(),
+            &ExecuteMsg::Update {
+                fee_spread_odds: params.fee_spread_odds,
+                max_bet_risk_factor: params.max_bet_risk_factor,
+                seed_liquidity_amplifier: params.seed_liquidity_amplifier,
+                initial_odds_home: params.initial_odds_home,
+                initial_odds_away: params.initial_odds_away,
+                start_timestamp: params.start_timestamp,
+            },
+            &[],
+        )
+    }
+
+    pub fn score_market(&mut self, sender: &Addr, result: MarketResult) -> AnyResult<AppResponse> {
+        self.blockchain.execute_contract(
+            sender.clone(),
+            self.addr(),
+            &ExecuteMsg::Score { result },
+            &[],
+        )
+    }
+
+    pub fn place_bet(
+        &mut self,
+        sender: &Addr,
+        result: MarketResult,
+        min_odds: Decimal,
+        receiver: Option<Addr>,
+        funds: &[Coin],
+    ) -> AnyResult<AppResponse> {
+        self.blockchain.execute_contract(
+            sender.clone(),
+            self.addr(),
+            &ExecuteMsg::PlaceBet {
+                result,
+                min_odds,
+                receiver,
+            },
+            funds,
+        )
+    }
+
+    pub fn claim_winnings(
+        &mut self,
+        sender: &Addr,
+        receiver: Option<Addr>,
+    ) -> AnyResult<AppResponse> {
+        self.blockchain.execute_contract(
+            sender.clone(),
+            self.addr(),
+            &ExecuteMsg::ClaimWinnings { receiver: receiver },
+            &[],
+        )
+    }
 }
 
 pub fn setup_blockchain_and_contract(

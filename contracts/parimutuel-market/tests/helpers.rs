@@ -1,34 +1,143 @@
-use cosmwasm_std::{to_json_binary, Addr, Coin, CosmosMsg, Empty, StdResult, WasmMsg};
-use cw_multi_test::{Contract, ContractWrapper};
+use cosmwasm_std::{Addr, Coin, StdResult};
+use cw_multi_test::{
+    error::AnyResult, App, AppBuilder, AppResponse, BankKeeper, ContractWrapper, Executor,
+    MockApiBech32,
+};
+use derivative::Derivative;
 use parimutuel_market::{
     contract::{execute, instantiate, query},
-    msg::ExecuteMsg,
+    msg::{
+        BetsByAddressResponse, BetsResponse, ConfigResponse, ExecuteMsg, InstantiateMsg,
+        MarketResponse, QueryMsg,
+    },
+    state::MarketResult,
 };
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-/// CwContract is a wrapper around Addr that provides a lot of helpers
-/// for working with this contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct CwContract(pub Addr);
+/// BlockchainContract is a wrapper around blockchain App and contract Addr
+/// that provides a lot of helpers for working with this contract.
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct BlockchainContract {
+    #[derivative(Debug = "ignore")]
+    pub blockchain: App<BankKeeper, MockApiBech32>,
+    pub contract_addr: Addr,
+}
 
-impl CwContract {
+impl BlockchainContract {
     pub fn addr(&self) -> Addr {
-        self.0.clone()
+        self.contract_addr.clone()
     }
 
-    pub fn call<T: Into<ExecuteMsg>>(&self, msg: T, funds: Vec<Coin>) -> StdResult<CosmosMsg> {
-        let msg = to_json_binary(&msg.into())?;
-        Ok(WasmMsg::Execute {
-            contract_addr: self.addr().into(),
-            msg,
+    pub fn query_config(&self) -> StdResult<ConfigResponse> {
+        self.blockchain
+            .wrap()
+            .query_wasm_smart(self.addr(), &QueryMsg::Config {})
+    }
+
+    pub fn query_market(&self) -> StdResult<MarketResponse> {
+        self.blockchain
+            .wrap()
+            .query_wasm_smart(self.addr(), &QueryMsg::Market {})
+    }
+
+    pub fn query_bets(&self) -> StdResult<BetsResponse> {
+        self.blockchain
+            .wrap()
+            .query_wasm_smart(self.addr(), &QueryMsg::Bets {})
+    }
+
+    pub fn query_bets_by_address(&self, address: &Addr) -> StdResult<BetsByAddressResponse> {
+        self.blockchain.wrap().query_wasm_smart(
+            self.addr(),
+            &QueryMsg::BetsByAddress {
+                address: address.clone(),
+            },
+        )
+    }
+
+    pub fn cancel_market(&mut self, sender: &Addr) -> AnyResult<AppResponse> {
+        self.blockchain
+            .execute_contract(sender.clone(), self.addr(), &ExecuteMsg::Cancel {}, &[])
+    }
+
+    pub fn update_market(&mut self, sender: &Addr, start_timestamp: u64) -> AnyResult<AppResponse> {
+        self.blockchain.execute_contract(
+            sender.clone(),
+            self.addr(),
+            &ExecuteMsg::Update { start_timestamp },
+            &[],
+        )
+    }
+
+    pub fn score_market(&mut self, sender: &Addr, result: MarketResult) -> AnyResult<AppResponse> {
+        self.blockchain.execute_contract(
+            sender.clone(),
+            self.addr(),
+            &ExecuteMsg::Score { result },
+            &[],
+        )
+    }
+
+    pub fn place_bet(
+        &mut self,
+        sender: &Addr,
+        result: MarketResult,
+        receiver: Option<Addr>,
+        funds: &[Coin],
+    ) -> AnyResult<AppResponse> {
+        self.blockchain.execute_contract(
+            sender.clone(),
+            self.addr(),
+            &ExecuteMsg::PlaceBet { result, receiver },
             funds,
-        }
-        .into())
+        )
+    }
+
+    pub fn claim_winnings(
+        &mut self,
+        sender: &Addr,
+        receiver: Option<Addr>,
+    ) -> AnyResult<AppResponse> {
+        self.blockchain.execute_contract(
+            sender.clone(),
+            self.addr(),
+            &ExecuteMsg::ClaimWinnings { receiver: receiver },
+            &[],
+        )
     }
 }
 
-pub fn contract_template() -> Box<dyn Contract<Empty>> {
-    let contract = ContractWrapper::new(execute, instantiate, query);
-    Box::new(contract)
+pub fn setup_blockchain_and_contract(
+    admin: Addr,
+    initial_balances: Vec<(Addr, Vec<Coin>)>,
+    instantiate_msg: InstantiateMsg,
+    instantiate_funds: Vec<Coin>,
+) -> BlockchainContract {
+    let mut blockchain = AppBuilder::new()
+        .with_api(MockApiBech32::new("neutron"))
+        .build(|router, _, storage| {
+            initial_balances.into_iter().for_each(|(addr, coins)| {
+                router.bank.init_balance(storage, &addr, coins).unwrap();
+            });
+        });
+
+    let code = Box::new(ContractWrapper::new(execute, instantiate, query));
+
+    let code_id = blockchain.store_code(code);
+
+    let contract_addr = blockchain
+        .instantiate_contract(
+            code_id,
+            admin.clone(),
+            &instantiate_msg,
+            &instantiate_funds,
+            "Market",
+            None,
+        )
+        .unwrap();
+
+    BlockchainContract {
+        blockchain,
+        contract_addr,
+    }
 }
