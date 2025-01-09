@@ -13,8 +13,19 @@ use crate::{
     },
 };
 
-// TODO - Add comments
-
+/// Places a bet on the market
+///
+/// The total bets result, potential payout result are updated and the address bets result
+/// that records the average odd and total bet amount per address is updated.
+///
+/// Then it will recalculate the new odds based on the new bet.
+///
+/// It will make the following checks:
+/// - The market needs to be active
+/// - The current block timestamp needs to be at least 5 minutes before the start timestamp
+/// - The minimum odds need to be less than the current odds
+/// - The bet amount needs to be greater than zero
+/// - The bet amount needs to be less than the max allowed bet
 pub fn execute_place_bet(
     deps: DepsMut,
     env: Env,
@@ -157,6 +168,14 @@ pub fn execute_place_bet(
         ))
 }
 
+/// Claims winnings for the sender or the receiver if defined or returns all bets
+/// made if the market was cancelled, it will calculate the winnings based on the
+/// average odds and the total bet amount for the address.
+///
+/// It will make the following checks:
+/// - The market needs to be closed
+/// - The address can't have claimed already
+/// - The address needs to have some amount to claim
 pub fn execute_claim_winnings(
     deps: DepsMut,
     info: MessageInfo,
@@ -230,6 +249,12 @@ pub fn execute_claim_winnings(
         .add_attribute("payout", payout.to_string()))
 }
 
+/// Updates the market with the new params, it will recalculate
+/// the new odds based on the new params.
+///
+/// It will make the following checks:
+/// - The sender needs to be the admin
+/// - The market needs to be active
 pub fn execute_update(
     deps: DepsMut,
     env: Env,
@@ -327,6 +352,14 @@ pub fn execute_update(
         ))
 }
 
+/// Scores the market and collects the outstanding balance to the treasury, the
+/// outstanding balance is calculated by deducing the total payout matching
+/// the market result.
+///
+/// It will make the following checks:
+/// - The sender needs to be the admin
+/// - The market needs to be active
+/// - The current block timestamp needs to be at least 30 minutes after the start timestamp
 pub fn execute_score(
     deps: DepsMut,
     env: Env,
@@ -405,6 +438,11 @@ pub fn execute_score(
         ))
 }
 
+/// Cancels the market
+///
+/// It will make the following checks:
+/// - The sender needs to be the admin
+/// - The market needs to be active
 pub fn execute_cancel(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let market = MARKET.load(deps.storage)?;

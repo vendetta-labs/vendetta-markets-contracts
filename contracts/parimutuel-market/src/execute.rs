@@ -11,8 +11,15 @@ use crate::{
     },
 };
 
-// TODO - Add comments
-
+/// Places a bet on the market
+///
+/// The total result is updated and the pool result that records the bet amount per address is updated.
+///
+/// It will make the following checks:
+/// - If the bet is on draw, the market needs to be drawable
+/// - The market needs to be active
+/// - The current block timestamp needs to be at least 5 minutes before the start timestamp
+/// - The bet amount needs to be greater than zero
 pub fn execute_place_bet(
     deps: DepsMut,
     env: Env,
@@ -99,6 +106,13 @@ pub fn execute_place_bet(
         .add_attribute("total_draw", TOTAL_DRAW.load(deps.storage)?.to_string()))
 }
 
+/// Claims winnings for the sender or the receiver if defined
+/// or returns all bets made if the market was cancelled
+///
+/// It will make the following checks:
+/// - The market needs to be closed
+/// - The address can't have claimed already
+/// - The address needs to have some amount to claim
 pub fn execute_claim_winnings(
     deps: DepsMut,
     info: MessageInfo,
@@ -200,6 +214,11 @@ pub fn execute_claim_winnings(
         .add_attribute("payout", payout.to_string()))
 }
 
+/// Updates the start timestamp of the market
+///
+/// It will make the following checks:
+/// - The sender needs to be the admin
+/// - The market needs to be active
 pub fn execute_update(
     deps: DepsMut,
     info: MessageInfo,
@@ -231,6 +250,15 @@ pub fn execute_update(
         .add_attribute("total_draw", TOTAL_DRAW.load(deps.storage)?.to_string()))
 }
 
+/// Scores the market and collects fees to the treasury,
+/// based on the fee_bps in the config
+///
+/// It will make the following checks:
+/// - The sender needs to be the admin
+/// - If the result is DRAW, the market needs to be drawable
+/// - The market needs to be active
+/// - The current block timestamp needs to be at least 30 minutes after the start timestamp
+/// - There needs to be some winnings
 pub fn execute_score(
     deps: DepsMut,
     env: Env,
@@ -314,6 +342,11 @@ pub fn execute_score(
         .add_attribute("total_draw", total_draw.to_string()))
 }
 
+/// Cancels the market
+///
+/// It will make the following checks:
+/// - The sender needs to be the admin
+/// - The market needs to be active
 pub fn execute_cancel(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let market = MARKET.load(deps.storage)?;
