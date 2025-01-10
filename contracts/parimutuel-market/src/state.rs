@@ -21,6 +21,7 @@ pub struct Config {
     pub treasury_addr: Addr,
     pub fee_bps: u64,
     pub denom: String,
+    pub denom_precision: u32,
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone, PartialEq, JsonSchema)]

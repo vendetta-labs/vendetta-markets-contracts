@@ -6,6 +6,7 @@ use crate::state::{Bet, BetAmount, Config, Market, MarketResult};
 #[cw_serde]
 pub struct InstantiateMsg {
     pub denom: String,
+    pub denom_precision: u32,
     pub id: String,
     pub label: String,
     pub home_team: String,

@@ -55,6 +55,7 @@ pub fn instantiate(
         admin_addr: Addr::unchecked(ADMIN_ADDRESS),
         treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
         denom: msg.denom.clone(),
+        denom_precision: msg.denom_precision,
         fee_spread_odds: msg.fee_spread_odds,
         max_bet_risk_factor: msg.max_bet_risk_factor,
         seed_liquidity_amplifier: msg.seed_liquidity_amplifier,

@@ -36,24 +36,24 @@ pub fn calculate_odds(
     let initial_home_probability = Decimal::one() / config.initial_odds_home;
     let initial_away_probability = Decimal::one() / config.initial_odds_away;
 
-    let total_bets = Decimal::from_atomics(home_total_bets, 6).unwrap()
-        + Decimal::from_atomics(away_total_bets, 6).unwrap();
+    let total_bets = Decimal::from_atomics(home_total_bets, config.denom_precision).unwrap()
+        + Decimal::from_atomics(away_total_bets, config.denom_precision).unwrap();
 
     let derived_home_probability = if total_bets != Decimal::zero() {
-        Decimal::from_atomics(home_total_bets, 6).unwrap() / total_bets
+        Decimal::from_atomics(home_total_bets, config.denom_precision).unwrap() / total_bets
     } else {
         Decimal::zero()
     };
 
     let derived_away_probability = if total_bets != Decimal::zero() {
-        Decimal::from_atomics(away_total_bets, 6).unwrap() / total_bets
+        Decimal::from_atomics(away_total_bets, config.denom_precision).unwrap() / total_bets
     } else {
         Decimal::zero()
     };
 
     let market_probabilities_weight = total_bets
         / (total_bets
-            + Decimal::from_atomics(market_seed_balance, 6).unwrap()
+            + Decimal::from_atomics(market_seed_balance, config.denom_precision).unwrap()
                 * config.seed_liquidity_amplifier);
 
     let new_home_probability = ((derived_home_probability * market_probabilities_weight)
@@ -90,7 +90,7 @@ pub struct AverageBet {
 ///
 /// The function returns the average bet, with odds truncated to 2 decimal places,
 /// the total and the previous payouts.
-pub fn calculate_average_bet(previous_bet: Bet, new_bet: Bet) -> AverageBet {
+pub fn calculate_average_bet(config: &Config, previous_bet: Bet, new_bet: Bet) -> AverageBet {
     let (previous_odds, previous_bet_amount) = previous_bet;
     let previous_payout = Uint128::from(previous_bet_amount)
         .multiply_ratio(previous_odds.numerator(), previous_odds.denominator());
@@ -103,8 +103,8 @@ pub fn calculate_average_bet(previous_bet: Bet, new_bet: Bet) -> AverageBet {
 
     let total_bet_amount = previous_bet_amount + new_bet_amount;
 
-    let average_odds = Decimal::from_atomics(total_payout, 6).unwrap()
-        / Decimal::from_atomics(total_bet_amount, 6).unwrap();
+    let average_odds = Decimal::from_atomics(total_payout, config.denom_precision).unwrap()
+        / Decimal::from_atomics(total_bet_amount, config.denom_precision).unwrap();
     let average_odds = truncate_decimal(average_odds, 2);
 
     let total_payout = Uint128::from(total_bet_amount)
@@ -158,12 +158,13 @@ pub fn calculate_max_bet(
     total_payout: Uint128,
     odds: Decimal,
 ) -> Uint128 {
-    let max_available_payout = Decimal::from_atomics(market_balance, 6).unwrap()
-        - Decimal::from_atomics(total_payout, 6).unwrap();
+    let max_available_payout = Decimal::from_atomics(market_balance, config.denom_precision)
+        .unwrap()
+        - Decimal::from_atomics(total_payout, config.denom_precision).unwrap();
 
     let max_bet_amount = max_available_payout / odds / config.max_bet_risk_factor;
 
-    convert_from_decimal_to_uint128(max_bet_amount, 6)
+    convert_from_decimal_to_uint128(max_bet_amount, config.denom_precision)
 }
 
 /// Truncates the decimal places and converts it to a Uint128

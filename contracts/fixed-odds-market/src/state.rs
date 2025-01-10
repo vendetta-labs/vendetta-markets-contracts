@@ -24,6 +24,7 @@ pub struct Config {
     pub admin_addr: Addr,
     pub treasury_addr: Addr,
     pub denom: String,
+    pub denom_precision: u32,
     pub fee_spread_odds: Decimal,     // Fee spread in percentage points
     pub max_bet_risk_factor: Decimal, // Max bet risk factor in multiplier, ex: 1.5x
     pub seed_liquidity_amplifier: Decimal, // Seed liquidity amplifier in multiplier, ex: 3x

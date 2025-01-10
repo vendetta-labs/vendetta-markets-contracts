@@ -45,6 +45,7 @@ pub fn instantiate(
         treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
         fee_bps: msg.fee_bps,
         denom: msg.denom.clone(),
+        denom_precision: msg.denom_precision,
     };
     CONFIG.save(deps.storage, &state)?;
 

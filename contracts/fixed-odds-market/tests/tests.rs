@@ -10,6 +10,7 @@ use helpers::setup_blockchain_and_contract;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const NATIVE_DENOM: &str = "denom";
+const NATIVE_DENOM_PRECISION: u32 = 6;
 const FAKE_DENOM: &str = "fakedenom";
 const OTHER: &str = "OTHER";
 const ANYONE: &str = "ANYONE";
@@ -53,6 +54,7 @@ mod create_market {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -147,6 +149,7 @@ mod place_bet {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -357,6 +360,7 @@ mod place_bet {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -468,6 +472,7 @@ mod place_bet {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -596,6 +601,7 @@ mod place_bet {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -668,6 +674,7 @@ mod place_bet {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -743,6 +750,7 @@ mod place_bet {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -822,6 +830,7 @@ mod place_bet {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -887,6 +896,7 @@ mod place_bet {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -960,6 +970,7 @@ mod claim_winnings {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1059,6 +1070,7 @@ mod claim_winnings {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1154,6 +1166,7 @@ mod claim_winnings {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1280,6 +1293,7 @@ mod claim_winnings {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1364,6 +1378,7 @@ mod claim_winnings {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1460,6 +1475,7 @@ mod claim_winnings {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1551,6 +1567,7 @@ mod update_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1646,6 +1663,7 @@ mod update_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1747,6 +1765,7 @@ mod update_market {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -1895,6 +1914,7 @@ mod update_market {
             ],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2009,6 +2029,7 @@ mod update_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2106,6 +2127,7 @@ mod update_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2163,6 +2185,7 @@ mod update_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2226,6 +2249,7 @@ mod score_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2311,6 +2335,7 @@ mod score_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2363,6 +2388,7 @@ mod score_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2413,6 +2439,7 @@ mod score_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2480,6 +2507,7 @@ mod cancel_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2515,6 +2543,7 @@ mod cancel_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
@@ -2563,6 +2592,7 @@ mod cancel_market {
             )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),

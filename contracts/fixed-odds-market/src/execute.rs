@@ -96,7 +96,8 @@ pub fn execute_place_bet(
     let mut average_odds = odds;
     let mut total_bet_amount = bet_amount;
     if previous_bet.is_some() {
-        let avergage_bet = calculate_average_bet(previous_bet.unwrap(), (odds, bet_amount.into()));
+        let avergage_bet =
+            calculate_average_bet(&config, previous_bet.unwrap(), (odds, bet_amount.into()));
         average_odds = avergage_bet.average_odds;
         total_bet_amount = avergage_bet.total_bet_amount.into();
         payout = avergage_bet.total_payout - avergage_bet.previous_payout;

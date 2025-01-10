@@ -7,6 +7,7 @@ use crate::state::{Config, Market, MarketResult};
 pub struct InstantiateMsg {
     pub fee_bps: u64, // Fee in basis points
     pub denom: String,
+    pub denom_precision: u32,
     pub id: String,
     pub label: String,
     pub home_team: String,
