@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, Coin, StdResult};
 use cw_multi_test::{
-    error::AnyResult, App, AppBuilder, AppResponse, BankKeeper, ContractWrapper, Executor,
-    MockApiBech32,
+    error::{AnyError, AnyResult},
+    App, AppBuilder, AppResponse, BankKeeper, ContractWrapper, Executor, MockApiBech32,
 };
 use derivative::Derivative;
 use parimutuel_market::{
@@ -101,7 +101,7 @@ impl BlockchainContract {
         self.blockchain.execute_contract(
             sender.clone(),
             self.addr(),
-            &ExecuteMsg::ClaimWinnings { receiver: receiver },
+            &ExecuteMsg::ClaimWinnings { receiver },
             &[],
         )
     }
@@ -112,7 +112,7 @@ pub fn setup_blockchain_and_contract(
     initial_balances: Vec<(Addr, Vec<Coin>)>,
     instantiate_msg: InstantiateMsg,
     instantiate_funds: Vec<Coin>,
-) -> BlockchainContract {
+) -> Result<BlockchainContract, AnyError> {
     let mut blockchain = AppBuilder::new()
         .with_api(MockApiBech32::new("neutron"))
         .build(|router, _, storage| {
@@ -125,19 +125,21 @@ pub fn setup_blockchain_and_contract(
 
     let code_id = blockchain.store_code(code);
 
-    let contract_addr = blockchain
-        .instantiate_contract(
-            code_id,
-            admin.clone(),
-            &instantiate_msg,
-            &instantiate_funds,
-            "Market",
-            None,
-        )
-        .unwrap();
+    let contract_addr = blockchain.instantiate_contract(
+        code_id,
+        admin.clone(),
+        &instantiate_msg,
+        &instantiate_funds,
+        "Market",
+        None,
+    );
 
-    BlockchainContract {
-        blockchain,
-        contract_addr,
+    if contract_addr.is_err() {
+        return Err(contract_addr.err().unwrap());
     }
+
+    Ok(BlockchainContract {
+        blockchain,
+        contract_addr: contract_addr.unwrap(),
+    })
 }

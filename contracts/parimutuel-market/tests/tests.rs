@@ -51,7 +51,8 @@ mod create_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
         assert_eq!(250, query_config.config.fee_bps);
@@ -68,9 +69,39 @@ mod create_market {
         assert_eq!("Team A", query_market.market.home_team);
         assert_eq!("Team B", query_market.market.away_team);
         assert_eq!(start_timestamp, query_market.market.start_timestamp);
-        assert_eq!(true, query_market.market.is_drawable);
+        assert!(query_market.market.is_drawable);
         assert_eq!(Status::ACTIVE, query_market.market.status);
         assert_eq!(None, query_market.market.result);
+    }
+
+    #[test]
+    fn unauthorized() {
+        let blockchain_contract = setup_blockchain_and_contract(
+            Addr::unchecked(USER_A),
+            vec![],
+            InstantiateMsg {
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                fee_bps: DEFAULT_FEE_BPS,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                start_timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 60 * 5, // 5 minutes from now
+                is_drawable: true,
+            },
+            vec![],
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            ContractError::Unauthorized {},
+            blockchain_contract.downcast::<ContractError>().unwrap()
+        );
     }
 }
 
@@ -120,7 +151,8 @@ mod place_bet {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -359,7 +391,8 @@ mod place_bet {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -416,7 +449,8 @@ mod place_bet {
                 is_drawable: false,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -476,7 +510,8 @@ mod place_bet {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
@@ -543,7 +578,8 @@ mod place_bet {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(start_timestamp);
@@ -610,7 +646,8 @@ mod place_bet {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -686,7 +723,8 @@ mod claim_winnings {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -780,7 +818,8 @@ mod claim_winnings {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -877,7 +916,8 @@ mod claim_winnings {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -946,7 +986,7 @@ mod claim_winnings {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(&Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
     }
@@ -987,7 +1027,8 @@ mod claim_winnings {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -1077,7 +1118,8 @@ mod claim_winnings {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -1179,7 +1221,8 @@ mod claim_winnings {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -1273,7 +1316,8 @@ mod update_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(start_timestamp, query_market.market.start_timestamp);
@@ -1313,7 +1357,8 @@ mod update_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(start_timestamp, query_market.market.start_timestamp);
@@ -1357,7 +1402,8 @@ mod update_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -1437,7 +1483,8 @@ mod score_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -1475,7 +1522,7 @@ mod score_market {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(&Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
             .unwrap();
         assert_eq!(50_u128, treasury_balance.amount.into());
 
@@ -1510,7 +1557,8 @@ mod score_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -1548,7 +1596,7 @@ mod score_market {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(&Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
 
@@ -1583,7 +1631,8 @@ mod score_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -1656,7 +1705,8 @@ mod score_market {
                 is_drawable: false,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -1726,7 +1776,8 @@ mod score_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
@@ -1774,7 +1825,8 @@ mod score_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -1858,7 +1910,8 @@ mod score_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -1919,7 +1972,8 @@ mod score_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -1991,7 +2045,8 @@ mod cancel_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::ACTIVE, query_market.market.status);
@@ -2024,11 +2079,12 @@ mod cancel_market {
                     .duration_since(UNIX_EPOCH)
                     .expect("Time went backwards")
                     .as_secs()
-                    + 60 * 5, // 5 minutes from now,
+                    + 60 * 5, // 5 minutes from now
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::ACTIVE, query_market.market.status);
@@ -2069,7 +2125,8 @@ mod cancel_market {
                 is_drawable: true,
             },
             vec![],
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(

@@ -2,6 +2,10 @@
 
 ## Tests
 
+### Create Market
+- [X] It properly creates a market
+- [X] It cant create a market if sender isnt the admin
+
 ### Place Bet
 - [X] It properly accepts bets
 - [X] The receiver will be the beneficiary when defined

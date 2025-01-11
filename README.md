@@ -24,6 +24,33 @@ rustup target add wasm32-unknown-unknown
 ```bash
 cargo test
 ```
+
+## How to prepare for audit
+
+### Format code
+
+```bash
+cargo fmt
+```
+
+### Fix linting issues (clippy)
+
+```bash
+cargo clippy --fix
+```
+
+### Check test coverage
+
+```bash
+cargo tarpaulin
+```
+
+### Verify dependencies
+
+```bash
+cargo audit
+```
+
 ## How to deploy
 
 ### Compile contracts

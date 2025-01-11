@@ -34,24 +34,10 @@ mod create_market {
 
         let blockchain_contract = setup_blockchain_and_contract(
             Addr::unchecked(ADMIN_ADDRESS),
-            vec![
-                (
-                    Addr::unchecked(ADMIN_ADDRESS),
-                    coins(INITIAL_BALANCE, NATIVE_DENOM),
-                ),
-                (
-                    Addr::unchecked(USER_A),
-                    coins(INITIAL_BALANCE, NATIVE_DENOM),
-                ),
-                (
-                    Addr::unchecked(USER_B),
-                    coins(INITIAL_BALANCE, NATIVE_DENOM),
-                ),
-                (
-                    Addr::unchecked(USER_C),
-                    coins(INITIAL_BALANCE, NATIVE_DENOM),
-                ),
-            ],
+            vec![(
+                Addr::unchecked(ADMIN_ADDRESS),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
             InstantiateMsg {
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
@@ -67,7 +53,8 @@ mod create_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
         assert_eq!(ADMIN_ADDRESS, query_config.config.admin_addr.as_str());
@@ -112,6 +99,78 @@ mod create_market {
         assert_eq!(
             Decimal::from_atomics(1_56_u128, 2).unwrap(),
             query_market.market.away_odds
+        );
+    }
+
+    #[test]
+    fn unauthorized() {
+        let err = setup_blockchain_and_contract(
+            Addr::unchecked(USER_A),
+            vec![(
+                Addr::unchecked(USER_A),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                start_timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 60 * 5, // 5 minutes from now
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            ContractError::Unauthorized {},
+            err.downcast::<ContractError>().unwrap()
+        );
+    }
+
+    #[test]
+    fn market_not_initially_funded() {
+        let err = setup_blockchain_and_contract(
+            Addr::unchecked(ADMIN_ADDRESS),
+            vec![(
+                Addr::unchecked(ADMIN_ADDRESS),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                start_timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 60 * 5, // 5 minutes from now
+            },
+            vec![],
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            ContractError::MarketNotInitiallyFunded {},
+            err.downcast::<ContractError>().unwrap()
         );
     }
 }
@@ -162,7 +221,8 @@ mod place_bet {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -247,7 +307,7 @@ mod place_bet {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(&Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
             .unwrap();
         assert_eq!(
             180_000_000_u128 - 78_900_000_u128,
@@ -373,7 +433,8 @@ mod place_bet {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -500,7 +561,8 @@ mod place_bet {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         let user_b = blockchain_contract.blockchain.api().addr_make(USER_B);
@@ -636,7 +698,8 @@ mod place_bet {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
@@ -711,7 +774,8 @@ mod place_bet {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(start_timestamp - 5 * 60 + 1); // 4 minutes 59 seconds before start timestamp
@@ -789,7 +853,8 @@ mod place_bet {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -871,7 +936,8 @@ mod place_bet {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -939,7 +1005,8 @@ mod place_bet {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -1015,7 +1082,8 @@ mod claim_winnings {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -1115,7 +1183,8 @@ mod claim_winnings {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -1211,7 +1280,8 @@ mod claim_winnings {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -1298,7 +1368,7 @@ mod claim_winnings {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(&Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
     }
@@ -1338,7 +1408,8 @@ mod claim_winnings {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -1423,7 +1494,8 @@ mod claim_winnings {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
         blockchain_contract
@@ -1460,7 +1532,7 @@ mod claim_winnings {
             .query_balance(&user_a, NATIVE_DENOM)
             .unwrap();
         assert_eq!(
-            INITIAL_BALANCE - 10__000_000_u128,
+            INITIAL_BALANCE - 10_000_000_u128,
             user_a_balance.amount.into()
         );
 
@@ -1520,7 +1592,8 @@ mod claim_winnings {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
@@ -1612,7 +1685,8 @@ mod update_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(start_timestamp, query_market.market.start_timestamp);
@@ -1708,7 +1782,8 @@ mod update_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
         assert_eq!(
@@ -1810,7 +1885,8 @@ mod update_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
         assert_eq!(
@@ -1959,7 +2035,8 @@ mod update_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
         assert_eq!(
@@ -2074,7 +2151,8 @@ mod update_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
         assert_eq!(
@@ -2172,7 +2250,8 @@ mod update_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(start_timestamp, query_market.market.start_timestamp);
@@ -2230,7 +2309,8 @@ mod update_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
@@ -2294,7 +2374,8 @@ mod score_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .place_bet(
@@ -2331,7 +2412,7 @@ mod score_market {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(&Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
 
@@ -2342,7 +2423,7 @@ mod score_market {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(&Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
             .unwrap();
         assert_eq!(103_900_000_u128, treasury_balance.amount.into());
 
@@ -2380,7 +2461,8 @@ mod score_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(
@@ -2433,7 +2515,8 @@ mod score_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         blockchain_contract
             .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
@@ -2484,7 +2567,8 @@ mod score_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(
@@ -2552,7 +2636,8 @@ mod cancel_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::ACTIVE, query_market.market.status);
@@ -2592,7 +2677,8 @@ mod cancel_market {
                     + 60 * 5, // 5 minutes from now
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::ACTIVE, query_market.market.status);
@@ -2637,7 +2723,8 @@ mod cancel_market {
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
-        );
+        )
+        .unwrap();
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(

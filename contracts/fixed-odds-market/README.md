@@ -2,6 +2,11 @@
 
 ## Tests
 
+### Create Market
+- [X] It properly creates a market
+- [X] It cant create a market if sender isnt the admin
+- [X] It cant create a market if no seed liquidity is provided
+
 ### Place Bet
 - [X] It properly accepts bets
 - [X] It properly averages bets when there are multiple bets from the same address
