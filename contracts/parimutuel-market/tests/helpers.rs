@@ -7,8 +7,8 @@ use derivative::Derivative;
 use parimutuel_market::{
     contract::{execute, instantiate, query},
     msg::{
-        BetsByAddressResponse, BetsResponse, ConfigResponse, ExecuteMsg, InstantiateMsg,
-        MarketResponse, QueryMsg,
+        BetsByAddressResponse, BetsResponse, ConfigResponse, EstimateWinningsResponse, ExecuteMsg,
+        InstantiateMsg, MarketResponse, QueryMsg,
     },
     state::MarketResult,
 };
@@ -51,6 +51,20 @@ impl BlockchainContract {
             self.addr(),
             &QueryMsg::BetsByAddress {
                 address: address.clone(),
+            },
+        )
+    }
+
+    pub fn query_estimate_winnings(
+        &self,
+        address: &Addr,
+        result: MarketResult,
+    ) -> StdResult<EstimateWinningsResponse> {
+        self.blockchain.wrap().query_wasm_smart(
+            self.addr(),
+            &QueryMsg::EstimateWinnings {
+                address: address.clone(),
+                result,
             },
         )
     }

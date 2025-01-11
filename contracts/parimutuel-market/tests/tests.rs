@@ -730,7 +730,7 @@ mod claim_winnings {
         blockchain_contract
             .place_bet(
                 &user_a,
-                MarketResult::DRAW,
+                MarketResult::AWAY,
                 None,
                 &coins(1_000, NATIVE_DENOM),
             )
@@ -740,7 +740,7 @@ mod claim_winnings {
         blockchain_contract
             .place_bet(
                 &other,
-                MarketResult::AWAY,
+                MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
             )
@@ -751,6 +751,16 @@ mod claim_winnings {
         assert_eq!(1_000, query_bets.totals.away);
         assert_eq!(0, query_bets.totals.home);
 
+        let user_a_winnings = blockchain_contract
+            .query_estimate_winnings(&user_a, MarketResult::AWAY)
+            .unwrap();
+        assert_eq!(2_000, user_a_winnings.estimate);
+
+        let other_winnings = blockchain_contract
+            .query_estimate_winnings(&other, MarketResult::AWAY)
+            .unwrap();
+        assert_eq!(0, other_winnings.estimate);
+
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(
                 start_timestamp + 60 * 30, // 30 minutes after the start timestamp
@@ -758,12 +768,12 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::AWAY)
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::CLOSED, query_market.market.status);
-        assert_eq!(MarketResult::DRAW, query_market.market.result.unwrap());
+        assert_eq!(MarketResult::AWAY, query_market.market.result.unwrap());
 
         let user_a_balance = blockchain_contract
             .blockchain
@@ -825,7 +835,7 @@ mod claim_winnings {
         blockchain_contract
             .place_bet(
                 &user_a,
-                MarketResult::DRAW,
+                MarketResult::HOME,
                 None,
                 &coins(1_000, NATIVE_DENOM),
             )
@@ -842,9 +852,19 @@ mod claim_winnings {
             .unwrap();
 
         let query_bets = blockchain_contract.query_bets().unwrap();
-        assert_eq!(1_000, query_bets.totals.draw);
+        assert_eq!(1_000, query_bets.totals.home);
         assert_eq!(1_000, query_bets.totals.away);
-        assert_eq!(0, query_bets.totals.home);
+        assert_eq!(0, query_bets.totals.draw);
+
+        let user_a_winnings = blockchain_contract
+            .query_estimate_winnings(&user_a, MarketResult::HOME)
+            .unwrap();
+        assert_eq!(2_000, user_a_winnings.estimate);
+
+        let other_winnings = blockchain_contract
+            .query_estimate_winnings(&other, MarketResult::HOME)
+            .unwrap();
+        assert_eq!(0, other_winnings.estimate);
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(
@@ -853,12 +873,12 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::CLOSED, query_market.market.status);
-        assert_eq!(MarketResult::DRAW, query_market.market.result.unwrap());
+        assert_eq!(MarketResult::HOME, query_market.market.result.unwrap());
 
         let user_a_balance = blockchain_contract
             .blockchain
@@ -1151,6 +1171,16 @@ mod claim_winnings {
                 start_timestamp + 60 * 30, // 30 minutes after the start timestamp
             );
         });
+
+        let user_a_winnings = blockchain_contract
+            .query_estimate_winnings(&user_a, MarketResult::DRAW)
+            .unwrap();
+        assert_eq!(2_000, user_a_winnings.estimate);
+
+        let other_winnings = blockchain_contract
+            .query_estimate_winnings(&other, MarketResult::DRAW)
+            .unwrap();
+        assert_eq!(0, other_winnings.estimate);
 
         blockchain_contract
             .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)

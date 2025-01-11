@@ -553,7 +553,7 @@ mod place_bet {
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
                 away_team: "Team B".to_string(),
-                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                fee_spread_odds: Decimal::from_atomics(7_u128, 2).unwrap(), // 0.07
                 max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
                 seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
                 initial_odds_home: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.2
@@ -570,16 +570,16 @@ mod place_bet {
         blockchain_contract
             .place_bet(
                 &user_a,
-                MarketResult::HOME,
-                Decimal::from_atomics(1_91_u128, 2).unwrap(),
+                MarketResult::AWAY,
+                Decimal::from_atomics(1_68_u128, 2).unwrap(),
                 Some(user_b.clone()),
                 &coins(10_000_000, NATIVE_DENOM),
             )
             .unwrap();
 
         let query_bets = blockchain_contract.query_bets().unwrap();
-        assert_eq!(10_000_000, query_bets.total_amounts.home);
-        assert_eq!(0, query_bets.total_amounts.away);
+        assert_eq!(0, query_bets.total_amounts.home);
+        assert_eq!(10_000_000, query_bets.total_amounts.away);
 
         let query_user_a_bets = blockchain_contract.query_bets_by_address(&user_a).unwrap();
         let home_bet_record = query_user_a_bets.all_bets.home;
@@ -593,16 +593,16 @@ mod place_bet {
 
         let query_user_b_bets = blockchain_contract.query_bets_by_address(&user_b).unwrap();
         let home_bet_record = query_user_b_bets.all_bets.home;
-        assert_eq!(
-            Decimal::from_atomics(1_91_u128, 2).unwrap(),
-            home_bet_record.odds
-        );
-        assert_eq!(10_000_000_u128, home_bet_record.bet_amount);
-        assert_eq!(19_100_000_u128, home_bet_record.payout);
+        assert_eq!(Decimal::zero(), home_bet_record.odds);
+        assert_eq!(0_u128, home_bet_record.bet_amount);
+        assert_eq!(0_u128, home_bet_record.payout);
         let away_bet_record = query_user_b_bets.all_bets.away;
-        assert_eq!(Decimal::zero(), away_bet_record.odds);
-        assert_eq!(0_u128, away_bet_record.bet_amount);
-        assert_eq!(0_u128, away_bet_record.payout);
+        assert_eq!(
+            Decimal::from_atomics(1_68_u128, 2).unwrap(),
+            away_bet_record.odds
+        );
+        assert_eq!(10_000_000_u128, away_bet_record.bet_amount);
+        assert_eq!(16_800_000_u128, away_bet_record.payout);
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(
@@ -611,12 +611,12 @@ mod place_bet {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::AWAY)
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::CLOSED, query_market.market.status);
-        assert_eq!(MarketResult::HOME, query_market.market.result.unwrap());
+        assert_eq!(MarketResult::AWAY, query_market.market.result.unwrap());
 
         let user_a_balance_before = blockchain_contract
             .blockchain
@@ -658,7 +658,7 @@ mod place_bet {
             .query_balance(user_b.clone(), NATIVE_DENOM)
             .unwrap();
         assert_eq!(
-            user_b_balance_before.amount + Uint128::new(19_100_000_u128),
+            user_b_balance_before.amount + Uint128::new(16_800_000_u128),
             user_b_balance_after.amount
         );
     }

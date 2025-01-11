@@ -143,3 +143,57 @@ fn convert_from_decimal_to_uint128(decimal: Decimal, decimals: u32) -> Uint128 {
 
     atomics
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::logic::{convert_from_decimal_to_uint128, truncate_decimal};
+    use cosmwasm_std::Decimal;
+    use cosmwasm_std::Uint128;
+
+    mod truncate_decimal {
+        use super::*;
+
+        #[test]
+        fn it_truncates_decimal() {
+            let decimal = Decimal::from_atomics(123_456789_u128, 6).unwrap();
+            let truncated_decimal = truncate_decimal(decimal, 2);
+            assert_eq!(
+                Decimal::from_atomics(123_45_u128, 2).unwrap(),
+                truncated_decimal
+            );
+
+            let decimal = Decimal::from_atomics(1_2_u128, 1).unwrap();
+            let truncated_decimal = truncate_decimal(decimal, 2);
+            assert_eq!(
+                Decimal::from_atomics(1_20_u128, 2).unwrap(),
+                truncated_decimal
+            );
+
+            let decimal = Decimal::from_atomics(2_3129321362139427_u128, 16).unwrap();
+            let truncated_decimal = truncate_decimal(decimal, 2);
+            assert_eq!(
+                Decimal::from_atomics(2_31_u128, 2).unwrap(),
+                truncated_decimal
+            );
+        }
+    }
+
+    mod convert_from_decimal_to_uint128 {
+        use super::*;
+
+        #[test]
+        fn it_converts_decimal_to_uint128() {
+            let decimal = Decimal::from_atomics(123_456789_u128, 6).unwrap();
+            let uint128 = convert_from_decimal_to_uint128(decimal, 6);
+            assert_eq!(Uint128::from(123_456789_u128), uint128);
+
+            let decimal = Decimal::from_atomics(1_2_u128, 1).unwrap();
+            let uint128 = convert_from_decimal_to_uint128(decimal, 1);
+            assert_eq!(Uint128::from(1_2_u128), uint128);
+
+            let decimal = Decimal::from_atomics(2_3129321362139427_u128, 16).unwrap();
+            let uint128 = convert_from_decimal_to_uint128(decimal, 16);
+            assert_eq!(Uint128::from(2_3129321362139427_u128), uint128);
+        }
+    }
+}
