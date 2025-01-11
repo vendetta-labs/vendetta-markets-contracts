@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal};
 
-use crate::state::{Bet, BetAmount, Config, Market, MarketResult};
+use crate::state::{BetAmount, Config, Market, MarketResult};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -96,9 +96,16 @@ pub struct BetsResponse {
 }
 
 #[cw_serde]
+pub struct BetRecordWithOdds {
+    pub bet_amount: BetAmount,
+    pub payout: u128,
+    pub odds: Decimal,
+}
+
+#[cw_serde]
 pub struct AllBets {
-    pub home: Bet,
-    pub away: Bet,
+    pub home: BetRecordWithOdds,
+    pub away: BetRecordWithOdds,
 }
 
 #[cw_serde]

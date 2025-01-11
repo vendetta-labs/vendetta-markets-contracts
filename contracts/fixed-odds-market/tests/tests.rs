@@ -62,8 +62,8 @@ mod create_market {
                 fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
                 max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
                 seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
-                initial_odds_home: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.2
-                initial_odds_away: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
+                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
                 start_timestamp,
             },
             coins(100_000_000, NATIVE_DENOM),
@@ -106,11 +106,11 @@ mod create_market {
         assert_eq!(Status::ACTIVE, query_market.market.status);
         assert_eq!(None, query_market.market.result);
         assert_eq!(
-            Decimal::from_atomics(191_u128, 2).unwrap(),
+            Decimal::from_atomics(1_91_u128, 2).unwrap(),
             query_market.market.home_odds
         );
         assert_eq!(
-            Decimal::from_atomics(156_u128, 2).unwrap(),
+            Decimal::from_atomics(1_56_u128, 2).unwrap(),
             query_market.market.away_odds
         );
     }
@@ -170,7 +170,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -182,7 +182,7 @@ mod place_bet {
             .place_bet(
                 &user_b,
                 MarketResult::AWAY,
-                Decimal::from_atomics(161_u128, 2).unwrap(),
+                Decimal::from_atomics(1_61_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -194,7 +194,7 @@ mod place_bet {
             .place_bet(
                 &user_c,
                 MarketResult::AWAY,
-                Decimal::from_atomics(157_u128, 2).unwrap(),
+                Decimal::from_atomics(1_57_u128, 2).unwrap(),
                 None,
                 &coins(40_000_000, NATIVE_DENOM),
             )
@@ -204,7 +204,7 @@ mod place_bet {
             .place_bet(
                 &user_c,
                 MarketResult::HOME,
-                Decimal::from_atomics(213_u128, 2).unwrap(),
+                Decimal::from_atomics(2_13_u128, 2).unwrap(),
                 None,
                 &coins(20_000_000, NATIVE_DENOM),
             )
@@ -381,7 +381,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(20_000_000, NATIVE_DENOM),
             )
@@ -391,7 +391,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(177_u128, 2).unwrap(),
+                Decimal::from_atomics(1_77_u128, 2).unwrap(),
                 None,
                 &coins(15_000_000, NATIVE_DENOM),
             )
@@ -401,17 +401,32 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(169_u128, 2).unwrap(),
+                Decimal::from_atomics(1_69_u128, 2).unwrap(),
                 None,
                 &coins(24_560_000, NATIVE_DENOM),
             )
             .unwrap();
 
+        let user_a_payout = 38_200_000_u128 + 26_550_000_u128 + 41_506_400_u128;
+
         let query_bets = blockchain_contract.query_bets().unwrap();
         assert_eq!(59_560_000, query_bets.total_amounts.home);
         assert_eq!(0, query_bets.total_amounts.away);
-        assert_eq!(106_016_800, query_bets.potential_payouts.home);
+        assert_eq!(user_a_payout, query_bets.potential_payouts.home);
         assert_eq!(0, query_bets.potential_payouts.away);
+
+        let query_user_a_bets = blockchain_contract.query_bets_by_address(&user_a).unwrap();
+        let home_bet_record = query_user_a_bets.all_bets.home;
+        assert_eq!(
+            Decimal::from_atomics(1_78402283411685695_u128, 17).unwrap(),
+            home_bet_record.odds
+        );
+        assert_eq!(59_560_000_u128, home_bet_record.bet_amount);
+        assert_eq!(user_a_payout, home_bet_record.payout);
+        let away_bet_record = query_user_a_bets.all_bets.away;
+        assert_eq!(Decimal::zero(), away_bet_record.odds);
+        assert_eq!(0_u128, away_bet_record.bet_amount);
+        assert_eq!(0_u128, away_bet_record.payout);
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(
@@ -445,7 +460,7 @@ mod place_bet {
             .query_balance(user_a.clone(), NATIVE_DENOM)
             .unwrap();
         assert_eq!(
-            INITIAL_BALANCE + 106_016_800_u128 - 59_560_000_u128,
+            INITIAL_BALANCE + user_a_payout - 59_560_000_u128,
             user_a_balance_after.amount.into()
         );
     }
@@ -494,7 +509,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 Some(user_b.clone()),
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -505,20 +520,27 @@ mod place_bet {
         assert_eq!(0, query_bets.total_amounts.away);
 
         let query_user_a_bets = blockchain_contract.query_bets_by_address(&user_a).unwrap();
-        let (home_odds, home_bet_amount) = query_user_a_bets.all_bets.home;
-        assert_eq!(Decimal::zero(), home_odds);
-        assert_eq!(0_u128, home_bet_amount);
-        let (away_odds, away_bet_amount) = query_user_a_bets.all_bets.away;
-        assert_eq!(Decimal::zero(), away_odds);
-        assert_eq!(0_u128, away_bet_amount);
+        let home_bet_record = query_user_a_bets.all_bets.home;
+        assert_eq!(Decimal::zero(), home_bet_record.odds);
+        assert_eq!(0_u128, home_bet_record.bet_amount);
+        assert_eq!(0_u128, home_bet_record.payout);
+        let away_bet_record = query_user_a_bets.all_bets.away;
+        assert_eq!(Decimal::zero(), away_bet_record.odds);
+        assert_eq!(0_u128, away_bet_record.bet_amount);
+        assert_eq!(0_u128, away_bet_record.payout);
 
         let query_user_b_bets = blockchain_contract.query_bets_by_address(&user_b).unwrap();
-        let (home_odds, home_bet_amount) = query_user_b_bets.all_bets.home;
-        assert_eq!(Decimal::from_atomics(191_u128, 2).unwrap(), home_odds);
-        assert_eq!(10_000_000_u128, home_bet_amount);
-        let (away_odds, away_bet_amount) = query_user_b_bets.all_bets.away;
-        assert_eq!(Decimal::zero(), away_odds);
-        assert_eq!(0_u128, away_bet_amount);
+        let home_bet_record = query_user_b_bets.all_bets.home;
+        assert_eq!(
+            Decimal::from_atomics(1_91_u128, 2).unwrap(),
+            home_bet_record.odds
+        );
+        assert_eq!(10_000_000_u128, home_bet_record.bet_amount);
+        assert_eq!(19_100_000_u128, home_bet_record.payout);
+        let away_bet_record = query_user_b_bets.all_bets.away;
+        assert_eq!(Decimal::zero(), away_bet_record.odds);
+        assert_eq!(0_u128, away_bet_record.bet_amount);
+        assert_eq!(0_u128, away_bet_record.payout);
 
         blockchain_contract.blockchain.update_block(|block| {
             block.time = Timestamp::from_seconds(
@@ -629,7 +651,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -644,12 +666,14 @@ mod place_bet {
         assert_eq!(0, query_bets.total_amounts.away);
 
         let query_user_a_bets = blockchain_contract.query_bets_by_address(&user_a).unwrap();
-        let (home_odds, home_bet_amount) = query_user_a_bets.all_bets.home;
-        assert_eq!(Decimal::zero(), home_odds);
-        assert_eq!(0_u128, home_bet_amount);
-        let (away_odds, away_bet_amount) = query_user_a_bets.all_bets.away;
-        assert_eq!(Decimal::zero(), away_odds);
-        assert_eq!(0_u128, away_bet_amount);
+        let home_bet_record = query_user_a_bets.all_bets.home;
+        assert_eq!(Decimal::zero(), home_bet_record.odds);
+        assert_eq!(0_u128, home_bet_record.bet_amount);
+        assert_eq!(0_u128, home_bet_record.payout);
+        let away_bet_record = query_user_a_bets.all_bets.away;
+        assert_eq!(Decimal::zero(), away_bet_record.odds);
+        assert_eq!(0_u128, away_bet_record.bet_amount);
+        assert_eq!(0_u128, away_bet_record.payout);
     }
 
     #[test]
@@ -702,7 +726,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -717,12 +741,14 @@ mod place_bet {
         assert_eq!(0, query_bets.total_amounts.away);
 
         let query_user_a_bets = blockchain_contract.query_bets_by_address(&user_a).unwrap();
-        let (home_odds, home_bet_amount) = query_user_a_bets.all_bets.home;
-        assert_eq!(Decimal::zero(), home_odds);
-        assert_eq!(0_u128, home_bet_amount);
-        let (away_odds, away_bet_amount) = query_user_a_bets.all_bets.away;
-        assert_eq!(Decimal::zero(), away_odds);
-        assert_eq!(0_u128, away_bet_amount);
+        let home_bet_record = query_user_a_bets.all_bets.home;
+        assert_eq!(Decimal::zero(), home_bet_record.odds);
+        assert_eq!(0_u128, home_bet_record.bet_amount);
+        assert_eq!(0_u128, home_bet_record.payout);
+        let away_bet_record = query_user_a_bets.all_bets.away;
+        assert_eq!(Decimal::zero(), away_bet_record.odds);
+        assert_eq!(0_u128, away_bet_record.bet_amount);
+        assert_eq!(0_u128, away_bet_record.payout);
     }
 
     #[test]
@@ -771,7 +797,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &[],
             )
@@ -785,7 +811,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, FAKE_DENOM),
             )
@@ -800,12 +826,14 @@ mod place_bet {
         assert_eq!(0, query_bets.total_amounts.away);
 
         let query_user_a_bets = blockchain_contract.query_bets_by_address(&user_a).unwrap();
-        let (home_odds, home_bet_amount) = query_user_a_bets.all_bets.home;
-        assert_eq!(Decimal::zero(), home_odds);
-        assert_eq!(0_u128, home_bet_amount);
-        let (away_odds, away_bet_amount) = query_user_a_bets.all_bets.away;
-        assert_eq!(Decimal::zero(), away_odds);
-        assert_eq!(0_u128, away_bet_amount);
+        let home_bet_record = query_user_a_bets.all_bets.home;
+        assert_eq!(Decimal::zero(), home_bet_record.odds);
+        assert_eq!(0_u128, home_bet_record.bet_amount);
+        assert_eq!(0_u128, home_bet_record.payout);
+        let away_bet_record = query_user_a_bets.all_bets.away;
+        assert_eq!(Decimal::zero(), away_bet_record.odds);
+        assert_eq!(0_u128, away_bet_record.bet_amount);
+        assert_eq!(0_u128, away_bet_record.payout);
     }
 
     #[test]
@@ -866,12 +894,14 @@ mod place_bet {
         assert_eq!(0, query_bets.total_amounts.away);
 
         let query_user_a_bets = blockchain_contract.query_bets_by_address(&user_a).unwrap();
-        let (home_odds, home_bet_amount) = query_user_a_bets.all_bets.home;
-        assert_eq!(Decimal::zero(), home_odds);
-        assert_eq!(0_u128, home_bet_amount);
-        let (away_odds, away_bet_amount) = query_user_a_bets.all_bets.away;
-        assert_eq!(Decimal::zero(), away_odds);
-        assert_eq!(0_u128, away_bet_amount);
+        let home_bet_record = query_user_a_bets.all_bets.home;
+        assert_eq!(Decimal::zero(), home_bet_record.odds);
+        assert_eq!(0_u128, home_bet_record.bet_amount);
+        assert_eq!(0_u128, home_bet_record.payout);
+        let away_bet_record = query_user_a_bets.all_bets.away;
+        assert_eq!(Decimal::zero(), away_bet_record.odds);
+        assert_eq!(0_u128, away_bet_record.bet_amount);
+        assert_eq!(0_u128, away_bet_record.payout);
     }
 
     #[test]
@@ -917,7 +947,7 @@ mod place_bet {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(34_910_000, NATIVE_DENOM),
             )
@@ -932,12 +962,14 @@ mod place_bet {
         assert_eq!(0, query_bets.total_amounts.away);
 
         let query_user_a_bets = blockchain_contract.query_bets_by_address(&user_a).unwrap();
-        let (home_odds, home_bet_amount) = query_user_a_bets.all_bets.home;
-        assert_eq!(Decimal::zero(), home_odds);
-        assert_eq!(0_u128, home_bet_amount);
-        let (away_odds, away_bet_amount) = query_user_a_bets.all_bets.away;
-        assert_eq!(Decimal::zero(), away_odds);
-        assert_eq!(0_u128, away_bet_amount);
+        let home_bet_record = query_user_a_bets.all_bets.home;
+        assert_eq!(Decimal::zero(), home_bet_record.odds);
+        assert_eq!(0_u128, home_bet_record.bet_amount);
+        assert_eq!(0_u128, home_bet_record.payout);
+        let away_bet_record = query_user_a_bets.all_bets.away;
+        assert_eq!(Decimal::zero(), away_bet_record.odds);
+        assert_eq!(0_u128, away_bet_record.bet_amount);
+        assert_eq!(0_u128, away_bet_record.payout);
     }
 }
 
@@ -990,7 +1022,7 @@ mod claim_winnings {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -1001,7 +1033,7 @@ mod claim_winnings {
             .place_bet(
                 &other,
                 MarketResult::AWAY,
-                Decimal::from_atomics(161_u128, 2).unwrap(),
+                Decimal::from_atomics(1_61_u128, 2).unwrap(),
                 None,
                 &coins(5_000_000, NATIVE_DENOM),
             )
@@ -1090,7 +1122,7 @@ mod claim_winnings {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -1186,7 +1218,7 @@ mod claim_winnings {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -1197,7 +1229,7 @@ mod claim_winnings {
             .place_bet(
                 &other,
                 MarketResult::AWAY,
-                Decimal::from_atomics(161_u128, 2).unwrap(),
+                Decimal::from_atomics(1_61_u128, 2).unwrap(),
                 None,
                 &coins(5_000_000, NATIVE_DENOM),
             )
@@ -1313,7 +1345,7 @@ mod claim_winnings {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -1398,7 +1430,7 @@ mod claim_winnings {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -1496,7 +1528,7 @@ mod claim_winnings {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -1638,11 +1670,11 @@ mod update_market {
         assert_eq!(Status::ACTIVE, query_market.market.status);
         assert_eq!(None, query_market.market.result);
         assert_eq!(
-            Decimal::from_atomics(191_u128, 2).unwrap(),
+            Decimal::from_atomics(1_91_u128, 2).unwrap(),
             query_market.market.home_odds
         );
         assert_eq!(
-            Decimal::from_atomics(156_u128, 2).unwrap(),
+            Decimal::from_atomics(1_56_u128, 2).unwrap(),
             query_market.market.away_odds
         );
     }
@@ -1734,11 +1766,11 @@ mod update_market {
         assert_eq!(Status::ACTIVE, query_market.market.status);
         assert_eq!(None, query_market.market.result);
         assert_eq!(
-            Decimal::from_atomics(176_u128, 2).unwrap(),
+            Decimal::from_atomics(1_76_u128, 2).unwrap(),
             query_market.market.home_odds
         );
         assert_eq!(
-            Decimal::from_atomics(144_u128, 2).unwrap(),
+            Decimal::from_atomics(1_44_u128, 2).unwrap(),
             query_market.market.away_odds
         );
     }
@@ -1792,7 +1824,7 @@ mod update_market {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(15_000_000, NATIVE_DENOM),
             )
@@ -1822,7 +1854,7 @@ mod update_market {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(34_910_000, NATIVE_DENOM),
             )
@@ -1836,7 +1868,7 @@ mod update_market {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(15_000_000, NATIVE_DENOM),
             )
@@ -1887,7 +1919,7 @@ mod update_market {
             query_market.market.home_odds
         );
         assert_eq!(
-            Decimal::from_atomics(164_u128, 2).unwrap(),
+            Decimal::from_atomics(1_64_u128, 2).unwrap(),
             query_market.market.away_odds
         );
     }
@@ -1941,7 +1973,7 @@ mod update_market {
             .place_bet(
                 &user_a,
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(15_000_000, NATIVE_DENOM),
             )
@@ -2004,11 +2036,11 @@ mod update_market {
         assert_eq!(Status::ACTIVE, query_market.market.status);
         assert_eq!(None, query_market.market.result);
         assert_eq!(
-            Decimal::from_atomics(184_u128, 2).unwrap(),
+            Decimal::from_atomics(1_84_u128, 2).unwrap(),
             query_market.market.home_odds
         );
         assert_eq!(
-            Decimal::from_atomics(161_u128, 2).unwrap(),
+            Decimal::from_atomics(1_61_u128, 2).unwrap(),
             query_market.market.away_odds
         );
     }
@@ -2102,7 +2134,7 @@ mod update_market {
         assert_eq!(Status::ACTIVE, query_market.market.status);
         assert_eq!(None, query_market.market.result);
         assert_eq!(
-            Decimal::from_atomics(147_u128, 2).unwrap(),
+            Decimal::from_atomics(1_47_u128, 2).unwrap(),
             query_market.market.home_odds
         );
         assert_eq!(
@@ -2268,7 +2300,7 @@ mod score_market {
             .place_bet(
                 &Addr::unchecked(ADMIN_ADDRESS),
                 MarketResult::HOME,
-                Decimal::from_atomics(191_u128, 2).unwrap(),
+                Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )
@@ -2278,7 +2310,7 @@ mod score_market {
             .place_bet(
                 &Addr::unchecked(ADMIN_ADDRESS),
                 MarketResult::AWAY,
-                Decimal::from_atomics(161_u128, 2).unwrap(),
+                Decimal::from_atomics(1_61_u128, 2).unwrap(),
                 None,
                 &coins(10_000_000, NATIVE_DENOM),
             )

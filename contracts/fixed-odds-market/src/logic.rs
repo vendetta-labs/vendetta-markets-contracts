@@ -1,7 +1,7 @@
-use cosmwasm_std::{Decimal, Fraction, Uint128};
+use cosmwasm_std::{Decimal, Uint128};
 use std::cmp::Ordering;
 
-use crate::state::{Bet, Config};
+use crate::state::Config;
 
 /// Calculates the new odds for a market
 ///
@@ -68,54 +68,6 @@ pub fn calculate_odds(
         truncate_decimal(Decimal::one() / new_home_probability, 2),
         truncate_decimal(Decimal::one() / new_away_probability, 2),
     )
-}
-
-#[derive(Debug)]
-pub struct AverageBet {
-    pub average_odds: Decimal,
-    pub total_bet_amount: u128,
-    pub total_payout: Uint128,
-    pub previous_payout: Uint128,
-}
-
-/// Calculates the average bet
-///
-/// The function takes the previous bet and new bet then calculates
-/// the average bet based on the following formula:
-///
-/// ```ignore
-/// average_odds = (previous_payout + new_payout) / new_payout
-/// total_bet_amount = previous_bet_amount + new_bet_amount
-/// ```
-///
-/// The function returns the average bet, with odds truncated to 2 decimal places,
-/// the total and the previous payouts.
-pub fn calculate_average_bet(config: &Config, previous_bet: Bet, new_bet: Bet) -> AverageBet {
-    let (previous_odds, previous_bet_amount) = previous_bet;
-    let previous_payout = Uint128::from(previous_bet_amount)
-        .multiply_ratio(previous_odds.numerator(), previous_odds.denominator());
-
-    let (new_odds, new_bet_amount) = new_bet;
-    let new_payout =
-        Uint128::from(new_bet_amount).multiply_ratio(new_odds.numerator(), new_odds.denominator());
-
-    let total_payout = previous_payout + new_payout;
-
-    let total_bet_amount = previous_bet_amount + new_bet_amount;
-
-    let average_odds = Decimal::from_atomics(total_payout, config.denom_precision).unwrap()
-        / Decimal::from_atomics(total_bet_amount, config.denom_precision).unwrap();
-    let average_odds = truncate_decimal(average_odds, 2);
-
-    let total_payout = Uint128::from(total_bet_amount)
-        .multiply_ratio(average_odds.numerator(), average_odds.denominator());
-
-    AverageBet {
-        average_odds,
-        total_bet_amount,
-        total_payout,
-        previous_payout,
-    }
 }
 
 /// Truncates the decimal places

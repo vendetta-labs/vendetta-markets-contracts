@@ -10,14 +10,15 @@ pub const MARKET: Item<Market> = Item::new("market");
 pub const CLAIMS: Map<Addr, bool> = Map::new("claims");
 
 pub const TOTAL_BETS_HOME: Item<u128> = Item::new("total_bets_home");
-pub const ADDR_BETS_HOME: Map<Addr, Bet> = Map::new("addr_bets_home");
+pub const ADDR_BETS_HOME: Map<Addr, BetRecord> = Map::new("addr_bets_home");
 pub const POTENTIAL_PAYOUT_HOME: Item<u128> = Item::new("potential_payout_home");
 pub const TOTAL_BETS_AWAY: Item<u128> = Item::new("total_bets_away");
-pub const ADDR_BETS_AWAY: Map<Addr, Bet> = Map::new("addr_bets_away");
+pub const ADDR_BETS_AWAY: Map<Addr, BetRecord> = Map::new("addr_bets_away");
 pub const POTENTIAL_PAYOUT_AWAY: Item<u128> = Item::new("potential_payout_away");
 
 pub type BetAmount = u128;
-pub type Bet = (Decimal, BetAmount);
+pub type BetPayout = u128;
+pub type BetRecord = (BetAmount, BetPayout);
 
 #[derive(Serialize, Debug, Deserialize, Clone, PartialEq, JsonSchema)]
 pub struct Config {

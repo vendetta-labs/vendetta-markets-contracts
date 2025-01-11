@@ -5,7 +5,7 @@ use cosmwasm_std::{
 
 use crate::{
     error::ContractError,
-    logic::{calculate_average_bet, calculate_max_bet, calculate_odds},
+    logic::{calculate_max_bet, calculate_odds},
     msg::UpdateParams,
     state::{
         MarketResult, Status, ADDR_BETS_AWAY, ADDR_BETS_HOME, CLAIMS, CONFIG, MARKET,
@@ -66,8 +66,6 @@ pub fn execute_place_bet(
     }
     let bet_amount = bet_amount.unwrap();
 
-    let mut payout = bet_amount.multiply_ratio(odds.numerator(), odds.denominator());
-
     let market_balance = deps
         .querier
         .query_balance(env.contract.address, &config.denom)?
@@ -88,19 +86,18 @@ pub fn execute_place_bet(
         return Err(ContractError::MaxBetExceeded {});
     }
 
-    let previous_bet = match result {
+    let bet_record = match result {
         MarketResult::HOME => ADDR_BETS_HOME.may_load(deps.storage, addr.clone())?,
         MarketResult::AWAY => ADDR_BETS_AWAY.may_load(deps.storage, addr.clone())?,
     };
 
-    let mut average_odds = odds;
     let mut total_bet_amount = bet_amount;
-    if previous_bet.is_some() {
-        let avergage_bet =
-            calculate_average_bet(&config, previous_bet.unwrap(), (odds, bet_amount.into()));
-        average_odds = avergage_bet.average_odds;
-        total_bet_amount = avergage_bet.total_bet_amount.into();
-        payout = avergage_bet.total_payout - avergage_bet.previous_payout;
+    let payout = bet_amount.multiply_ratio(odds.numerator(), odds.denominator());
+    let mut total_payout = payout;
+    if bet_record.is_some() {
+        let (previous_total_bet_amount, previous_total_payout) = bet_record.unwrap();
+        total_bet_amount += Uint128::from(previous_total_bet_amount);
+        total_payout += Uint128::from(previous_total_payout);
     }
 
     match result {
@@ -111,7 +108,7 @@ pub fn execute_place_bet(
             ADDR_BETS_HOME.save(
                 deps.storage,
                 addr.clone(),
-                &(average_odds, total_bet_amount.into()),
+                &(total_bet_amount.into(), total_payout.into()),
             )?;
             POTENTIAL_PAYOUT_HOME.update(deps.storage, |total| -> StdResult<_> {
                 Ok((Uint128::from(total) + payout).into())
@@ -124,7 +121,7 @@ pub fn execute_place_bet(
             ADDR_BETS_AWAY.save(
                 deps.storage,
                 addr.clone(),
-                &(average_odds, total_bet_amount.into()),
+                &(total_bet_amount.into(), total_payout.into()),
             )?;
             POTENTIAL_PAYOUT_AWAY.update(deps.storage, |total| -> StdResult<_> {
                 Ok((Uint128::from(total) + payout).into())
@@ -203,22 +200,17 @@ pub fn execute_claim_winnings(
 
     let mut payout = 0;
     if market.status == Status::CANCELLED {
-        payout =
-            home_bet.unwrap_or((Decimal::one(), 0)).1 + away_bet.unwrap_or((Decimal::one(), 0)).1;
+        payout = home_bet.unwrap_or((0, 0)).0 + away_bet.unwrap_or((0, 0)).0;
     } else {
         match market.result {
             Some(MarketResult::HOME) => {
-                if let Some((odds, bet_amount)) = home_bet {
-                    payout = Uint128::from(bet_amount)
-                        .multiply_ratio(odds.numerator(), odds.denominator())
-                        .into();
+                if let Some((_, total_payout)) = home_bet {
+                    payout = total_payout;
                 }
             }
             Some(MarketResult::AWAY) => {
-                if let Some((odds, bet_amount)) = away_bet {
-                    payout = Uint128::from(bet_amount)
-                        .multiply_ratio(odds.numerator(), odds.denominator())
-                        .into();
+                if let Some((_, total_payout)) = away_bet {
+                    payout = total_payout;
                 }
             }
             None => (),
