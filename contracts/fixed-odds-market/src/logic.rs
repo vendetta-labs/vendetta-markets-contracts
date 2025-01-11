@@ -158,7 +158,7 @@ mod tests {
             let decimal = Decimal::from_atomics(123_456789_u128, 6).unwrap();
             let truncated_decimal = truncate_decimal(decimal, 2);
             assert_eq!(
-                Decimal::from_atomics(123_45_u128, 2).unwrap(),
+                Decimal::from_atomics(12_345_u128, 2).unwrap(),
                 truncated_decimal
             );
 
