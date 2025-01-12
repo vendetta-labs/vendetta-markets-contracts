@@ -112,5 +112,4 @@ pub struct AllBets {
 pub struct BetsByAddressResponse {
     pub address: Addr,
     pub all_bets: AllBets,
-    pub potential_payouts: PotentialPayouts,
 }

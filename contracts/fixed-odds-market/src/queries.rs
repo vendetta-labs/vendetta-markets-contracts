@@ -77,9 +77,5 @@ pub fn query_bets_by_address(deps: Deps, address: Addr) -> StdResult<BetsByAddre
         },
     };
 
-    Ok(BetsByAddressResponse {
-        address,
-        all_bets,
-        potential_payouts: PotentialPayouts { home: 0, away: 0 },
-    })
+    Ok(BetsByAddressResponse { address, all_bets })
 }
