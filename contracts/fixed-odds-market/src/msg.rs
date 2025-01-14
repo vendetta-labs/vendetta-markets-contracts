@@ -61,6 +61,8 @@ pub enum QueryMsg {
     Config {},
     #[returns(MarketResponse)]
     Market {},
+    #[returns(MaxBetsResponse)]
+    MaxBets {},
     #[returns(BetsResponse)]
     Bets {},
     #[returns(BetsByAddressResponse)]
@@ -75,6 +77,12 @@ pub struct ConfigResponse {
 #[cw_serde]
 pub struct MarketResponse {
     pub market: Market,
+}
+
+#[cw_serde]
+pub struct MaxBetsResponse {
+    pub home: BetAmount,
+    pub away: BetAmount,
 }
 
 #[cw_serde]

@@ -10,9 +10,9 @@ use crate::{
     execute::{
         execute_cancel, execute_claim_winnings, execute_place_bet, execute_score, execute_update,
     },
-    logic::calculate_odds,
+    logic::{calculate_max_bet, calculate_odds},
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UpdateParams},
-    queries::{query_bets, query_bets_by_address, query_config, query_market},
+    queries::{query_bets, query_bets_by_address, query_config, query_market, query_max_bets},
     state::{
         Config, Market, Status, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY, POTENTIAL_PAYOUT_HOME,
         TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
@@ -51,7 +51,7 @@ pub fn instantiate(
         CONTRACT_VERSION,
     )?;
 
-    let state = Config {
+    let config = Config {
         admin_addr: Addr::unchecked(ADMIN_ADDRESS),
         treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
         denom: msg.denom.clone(),
@@ -62,7 +62,7 @@ pub fn instantiate(
         initial_odds_home: msg.initial_odds_home,
         initial_odds_away: msg.initial_odds_away,
     };
-    CONFIG.save(deps.storage, &state)?;
+    CONFIG.save(deps.storage, &config)?;
 
     TOTAL_BETS_HOME.save(deps.storage, &0)?;
     POTENTIAL_PAYOUT_HOME.save(deps.storage, &0)?;
@@ -70,7 +70,7 @@ pub fn instantiate(
     POTENTIAL_PAYOUT_AWAY.save(deps.storage, &0)?;
 
     let (home_odds, away_odds) =
-        calculate_odds(&state, market_balance, Uint128::zero(), Uint128::zero());
+        calculate_odds(&config, market_balance, Uint128::zero(), Uint128::zero());
 
     let market = Market {
         id: msg.id,
@@ -84,6 +84,11 @@ pub fn instantiate(
         result: None,
     };
     MARKET.save(deps.storage, &market)?;
+
+    let home_max_bet =
+        calculate_max_bet(&config, market_balance, Uint128::zero(), market.home_odds);
+    let away_max_bet =
+        calculate_max_bet(&config, market_balance, Uint128::zero(), market.away_odds);
 
     Ok(Response::new()
         .add_attribute("protocol", "vendetta-markets")
@@ -105,17 +110,20 @@ pub fn instantiate(
         .add_attribute("label", market.label)
         .add_attribute("home_team", market.home_team)
         .add_attribute("home_odds", market.home_odds.to_string())
+        .add_attribute("home_max_bet", home_max_bet.to_string())
         .add_attribute("away_team", market.away_team)
         .add_attribute("away_odds", market.away_odds.to_string())
+        .add_attribute("away_max_bet", away_max_bet.to_string())
         .add_attribute("start_timestamp", market.start_timestamp.to_string())
         .add_attribute("status", Status::ACTIVE.to_string()))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
         QueryMsg::Market {} => to_json_binary(&query_market(deps)?),
+        QueryMsg::MaxBets {} => to_json_binary(&query_max_bets(deps, env)?),
         QueryMsg::Bets {} => to_json_binary(&query_bets(deps)?),
         QueryMsg::BetsByAddress { address } => {
             to_json_binary(&query_bets_by_address(deps, address)?)
@@ -158,6 +166,6 @@ pub fn execute(
             },
         ),
         ExecuteMsg::Score { result } => execute_score(deps, env, info, result),
-        ExecuteMsg::Cancel {} => execute_cancel(deps, info),
+        ExecuteMsg::Cancel {} => execute_cancel(deps, env, info),
     }
 }

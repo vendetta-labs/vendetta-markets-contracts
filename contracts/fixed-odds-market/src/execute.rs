@@ -142,6 +142,21 @@ pub fn execute_place_bet(
     market.away_odds = new_away_odds;
     MARKET.save(deps.storage, &market)?;
 
+    let potential_payout_home = POTENTIAL_PAYOUT_HOME.load(deps.storage)?;
+    let potential_payout_away = POTENTIAL_PAYOUT_AWAY.load(deps.storage)?;
+    let new_home_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_home),
+        new_home_odds,
+    );
+    let new_away_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_away),
+        new_away_odds,
+    );
+
     Ok(Response::new()
         .add_attribute("protocol", "vendetta-markets")
         .add_attribute("market_type", "fixed-odds")
@@ -154,16 +169,12 @@ pub fn execute_place_bet(
         .add_attribute("potential_payout", payout.to_string())
         .add_attribute("new_home_odds", market.home_odds.to_string())
         .add_attribute("new_away_odds", market.away_odds.to_string())
+        .add_attribute("new_home_max_bet", new_home_max_bet.to_string())
+        .add_attribute("new_away_max_bet", new_away_max_bet.to_string())
         .add_attribute("total_bets_home", home_total_bets.to_string())
         .add_attribute("total_bets_away", away_total_bets.to_string())
-        .add_attribute(
-            "potential_payout_home",
-            POTENTIAL_PAYOUT_HOME.load(deps.storage)?.to_string(),
-        )
-        .add_attribute(
-            "potential_payout_away",
-            POTENTIAL_PAYOUT_AWAY.load(deps.storage)?.to_string(),
-        ))
+        .add_attribute("potential_payout_home", potential_payout_home.to_string())
+        .add_attribute("potential_payout_away", potential_payout_away.to_string()))
 }
 
 /// Claims winnings for the sender or the receiver if defined or returns all bets
@@ -320,6 +331,21 @@ pub fn execute_update(
     market.away_odds = new_away_odds;
     MARKET.save(deps.storage, &market)?;
 
+    let potential_payout_home = POTENTIAL_PAYOUT_HOME.load(deps.storage)?;
+    let potential_payout_away = POTENTIAL_PAYOUT_AWAY.load(deps.storage)?;
+    let new_home_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_home),
+        new_home_odds,
+    );
+    let new_away_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_away),
+        new_away_odds,
+    );
+
     Ok(Response::new()
         .add_attribute("protocol", "vendetta-markets")
         .add_attribute("market_type", "fixed-odds")
@@ -333,16 +359,12 @@ pub fn execute_update(
         .add_attribute("start_timestamp", start_timestamp_update)
         .add_attribute("home_odds", market.home_odds.to_string())
         .add_attribute("away_odds", market.away_odds.to_string())
+        .add_attribute("home_max_bet", new_home_max_bet.to_string())
+        .add_attribute("away_max_bet", new_away_max_bet.to_string())
         .add_attribute("total_bets_home", home_total_bets.to_string())
         .add_attribute("total_bets_away", away_total_bets.to_string())
-        .add_attribute(
-            "potential_payout_home",
-            POTENTIAL_PAYOUT_HOME.load(deps.storage)?.to_string(),
-        )
-        .add_attribute(
-            "potential_payout_away",
-            POTENTIAL_PAYOUT_AWAY.load(deps.storage)?.to_string(),
-        ))
+        .add_attribute("potential_payout_home", potential_payout_home.to_string())
+        .add_attribute("potential_payout_away", potential_payout_away.to_string()))
 }
 
 /// Scores the market and collects the outstanding balance to the treasury, the
@@ -402,6 +424,21 @@ pub fn execute_score(
         );
     }
 
+    let potential_payout_home = POTENTIAL_PAYOUT_HOME.load(deps.storage)?;
+    let potential_payout_away = POTENTIAL_PAYOUT_AWAY.load(deps.storage)?;
+    let home_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_home),
+        market.home_odds,
+    );
+    let away_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_away),
+        market.away_odds,
+    );
+
     Ok(Response::new()
         .add_messages(messages)
         .add_attribute("protocol", "vendetta-markets")
@@ -413,6 +450,8 @@ pub fn execute_score(
         .add_attribute("market_outstanding_balance", market_outstanding_balance)
         .add_attribute("home_odds", market.home_odds.to_string())
         .add_attribute("away_odds", market.away_odds.to_string())
+        .add_attribute("home_max_bet", home_max_bet.to_string())
+        .add_attribute("away_max_bet", away_max_bet.to_string())
         .add_attribute(
             "total_bets_home",
             TOTAL_BETS_HOME.load(deps.storage)?.to_string(),
@@ -436,7 +475,11 @@ pub fn execute_score(
 /// It will make the following checks:
 /// - The sender needs to be the admin
 /// - The market needs to be active
-pub fn execute_cancel(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
+pub fn execute_cancel(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let market = MARKET.load(deps.storage)?;
 
@@ -453,6 +496,26 @@ pub fn execute_cancel(deps: DepsMut, info: MessageInfo) -> Result<Response, Cont
         Ok(market)
     })?;
 
+    let market_balance = deps
+        .querier
+        .query_balance(&env.contract.address, &config.denom)?
+        .amount;
+
+    let potential_payout_home = POTENTIAL_PAYOUT_HOME.load(deps.storage)?;
+    let potential_payout_away = POTENTIAL_PAYOUT_AWAY.load(deps.storage)?;
+    let home_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_home),
+        market.home_odds,
+    );
+    let away_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_away),
+        market.away_odds,
+    );
+
     Ok(Response::new()
         .add_attribute("protocol", "vendetta-markets")
         .add_attribute("market_type", "fixed-odds")
@@ -461,6 +524,8 @@ pub fn execute_cancel(deps: DepsMut, info: MessageInfo) -> Result<Response, Cont
         .add_attribute("status", Status::CANCELLED.to_string())
         .add_attribute("home_odds", market.home_odds.to_string())
         .add_attribute("away_odds", market.away_odds.to_string())
+        .add_attribute("home_max_bet", home_max_bet.to_string())
+        .add_attribute("away_max_bet", away_max_bet.to_string())
         .add_attribute(
             "total_bets_home",
             TOTAL_BETS_HOME.load(deps.storage)?.to_string(),

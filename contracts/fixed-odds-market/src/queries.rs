@@ -1,12 +1,13 @@
-use cosmwasm_std::{Addr, Decimal, Deps, StdResult};
+use cosmwasm_std::{Addr, Decimal, Deps, Env, StdResult, Uint128};
 
 use crate::{
+    logic::calculate_max_bet,
     msg::{
         AllBets, BetRecordWithOdds, BetsByAddressResponse, BetsResponse, ConfigResponse,
-        MarketResponse, PotentialPayouts, TotalAmounts,
+        MarketResponse, MaxBetsResponse, PotentialPayouts, TotalAmounts,
     },
     state::{
-        ADDR_BETS_AWAY, ADDR_BETS_HOME, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY,
+        Status, ADDR_BETS_AWAY, ADDR_BETS_HOME, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY,
         POTENTIAL_PAYOUT_HOME, TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
     },
 };
@@ -20,7 +21,44 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 /// Returns the current state and data of the market
 pub fn query_market(deps: Deps) -> StdResult<MarketResponse> {
     let market = MARKET.load(deps.storage)?;
+
     Ok(MarketResponse { market })
+}
+
+/// Returns the market max bet for each result
+pub fn query_max_bets(deps: Deps, env: Env) -> StdResult<MaxBetsResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    let market = MARKET.load(deps.storage)?;
+
+    if market.status != Status::ACTIVE {
+        return Ok(MaxBetsResponse { home: 0, away: 0 });
+    }
+
+    let market_balance = deps
+        .querier
+        .query_balance(env.contract.address, &config.denom)?
+        .amount;
+
+    let potential_payout_home = POTENTIAL_PAYOUT_HOME.load(deps.storage)?;
+    let potential_payout_away = POTENTIAL_PAYOUT_AWAY.load(deps.storage)?;
+
+    let home_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_home),
+        market.home_odds,
+    );
+    let away_max_bet = calculate_max_bet(
+        &config,
+        market_balance,
+        Uint128::from(potential_payout_away),
+        market.away_odds,
+    );
+
+    Ok(MaxBetsResponse {
+        home: home_max_bet.into(),
+        away: away_max_bet.into(),
+    })
 }
 
 /// Returns the total bets and potential payouts of the market
