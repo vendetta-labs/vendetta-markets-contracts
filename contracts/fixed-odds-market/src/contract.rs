@@ -11,7 +11,7 @@ use crate::{
         execute_cancel, execute_claim_winnings, execute_place_bet, execute_score, execute_update,
     },
     logic::{calculate_max_bet, calculate_odds},
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UpdateParams},
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, UpdateParams},
     queries::{query_bets, query_bets_by_address, query_config, query_market, query_max_bets},
     state::{
         Config, Market, Status, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY, POTENTIAL_PAYOUT_HOME,
@@ -168,4 +168,9 @@ pub fn execute(
         ExecuteMsg::Score { result } => execute_score(deps, env, info, result),
         ExecuteMsg::Cancel {} => execute_cancel(deps, env, info),
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    Ok(Response::default())
 }

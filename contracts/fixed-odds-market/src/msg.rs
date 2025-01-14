@@ -121,3 +121,6 @@ pub struct BetsByAddressResponse {
     pub address: Addr,
     pub all_bets: AllBets,
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}
