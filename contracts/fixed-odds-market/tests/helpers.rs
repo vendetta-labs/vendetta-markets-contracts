@@ -8,7 +8,7 @@ use fixed_odds_market::{
     contract::{execute, instantiate, query},
     msg::{
         BetsByAddressResponse, BetsResponse, ConfigResponse, ExecuteMsg, InstantiateMsg,
-        MarketResponse, QueryMsg, UpdateParams,
+        MarketResponse, MaxBetsResponse, QueryMsg, UpdateParams,
     },
     state::MarketResult,
 };
@@ -38,6 +38,12 @@ impl BlockchainContract {
         self.blockchain
             .wrap()
             .query_wasm_smart(self.addr(), &QueryMsg::Market {})
+    }
+
+    pub fn query_max_bets(&self) -> StdResult<MaxBetsResponse> {
+        self.blockchain
+            .wrap()
+            .query_wasm_smart(self.addr(), &QueryMsg::MaxBets {})
     }
 
     pub fn query_bets(&self) -> StdResult<BetsResponse> {

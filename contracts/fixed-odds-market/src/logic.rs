@@ -110,14 +110,6 @@ pub fn calculate_max_bet(
     total_payout: Uint128,
     odds: Decimal,
 ) -> Uint128 {
-    println!(
-        "market_balance: {:?}",
-        Decimal::from_atomics(market_balance, config.denom_precision).unwrap()
-    );
-    println!(
-        "total_payout: {:?}",
-        Decimal::from_atomics(total_payout, config.denom_precision).unwrap()
-    );
     let max_available_payout = Decimal::from_atomics(market_balance, config.denom_precision)
         .unwrap()
         - Decimal::from_atomics(total_payout, config.denom_precision).unwrap();

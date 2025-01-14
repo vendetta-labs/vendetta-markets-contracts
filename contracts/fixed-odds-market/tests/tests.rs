@@ -100,6 +100,10 @@ mod create_market {
             Decimal::from_atomics(1_56_u128, 2).unwrap(),
             query_market.market.away_odds
         );
+
+        let query_max_bets = blockchain_contract.query_max_bets().unwrap();
+        assert_eq!(34_904_013, query_max_bets.home);
+        assert_eq!(42_735_042, query_max_bets.away);
     }
 
     #[test]
@@ -224,6 +228,10 @@ mod place_bet {
         )
         .unwrap();
 
+        let query_max_bets = blockchain_contract.query_max_bets().unwrap();
+        assert_eq!(34_904_013, query_max_bets.home);
+        assert_eq!(42_735_042, query_max_bets.away);
+
         let user_a = blockchain_contract.blockchain.api().addr_make(USER_A);
 
         blockchain_contract
@@ -236,6 +244,10 @@ mod place_bet {
             )
             .unwrap();
 
+        let query_max_bets = blockchain_contract.query_max_bets().unwrap();
+        assert_eq!(32_934_782, query_max_bets.home);
+        assert_eq!(45_548_654, query_max_bets.away);
+
         let user_b = blockchain_contract.blockchain.api().addr_make(USER_B);
 
         blockchain_contract
@@ -247,6 +259,10 @@ mod place_bet {
                 &coins(10_000_000, NATIVE_DENOM),
             )
             .unwrap();
+
+        let query_max_bets = blockchain_contract.query_max_bets().unwrap();
+        assert_eq!(35_403_508, query_max_bets.home);
+        assert_eq!(44_118_895, query_max_bets.away);
 
         let user_c = blockchain_contract.blockchain.api().addr_make(USER_C);
 
@@ -269,6 +285,10 @@ mod place_bet {
                 &coins(20_000_000, NATIVE_DENOM),
             )
             .unwrap();
+
+        let query_max_bets = blockchain_contract.query_max_bets().unwrap();
+        assert_eq!(39_831_649, query_max_bets.home);
+        assert_eq!(44_342_105, query_max_bets.away);
 
         let query_bets = blockchain_contract.query_bets().unwrap();
         assert_eq!(30_000_000, query_bets.total_amounts.home);
@@ -303,6 +323,10 @@ mod place_bet {
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::CLOSED, query_market.market.status);
         assert_eq!(MarketResult::AWAY, query_market.market.result.unwrap());
+
+        let query_max_bets = blockchain_contract.query_max_bets().unwrap();
+        assert_eq!(0, query_max_bets.home);
+        assert_eq!(0, query_max_bets.away);
 
         let treasury_balance = blockchain_contract
             .blockchain
