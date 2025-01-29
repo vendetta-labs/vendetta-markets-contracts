@@ -238,7 +238,7 @@ mod create_market {
                 home_team: "Team A".to_string(),
                 away_team: "Team B".to_string(),
                 fee_spread_odds: Decimal::from_atomics(25_u128, 2).unwrap(), // 0.15
-                max_bet_risk_factor: Decimal::from_atomics(10_1_u128, 1).unwrap(), // 10.1
+                max_bet_risk_factor: Decimal::from_atomics(101_u128, 1).unwrap(), // 10.1
                 seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
                 initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
                 initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
@@ -248,7 +248,7 @@ mod create_market {
         )
         .unwrap_err();
         assert_eq!(
-            ContractError::InvalidMaxBetRiskFactor(Decimal::from_atomics(10_1_u128, 1).unwrap()),
+            ContractError::InvalidMaxBetRiskFactor(Decimal::from_atomics(101_u128, 1).unwrap()),
             err.downcast::<ContractError>().unwrap()
         );
     }
@@ -306,7 +306,7 @@ mod create_market {
                 away_team: "Team B".to_string(),
                 fee_spread_odds: Decimal::from_atomics(25_u128, 2).unwrap(), // 0.15
                 max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
-                seed_liquidity_amplifier: Decimal::from_atomics(10_1_u128, 1).unwrap(), // 10.1
+                seed_liquidity_amplifier: Decimal::from_atomics(101_u128, 1).unwrap(), // 10.1
                 initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
                 initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
                 start_timestamp,
@@ -316,7 +316,7 @@ mod create_market {
         .unwrap_err();
         assert_eq!(
             ContractError::InvalidSeedLiquidityAmplifier(
-                Decimal::from_atomics(10_1_u128, 1).unwrap()
+                Decimal::from_atomics(101_u128, 1).unwrap()
             ),
             err.downcast::<ContractError>().unwrap()
         );
@@ -3045,7 +3045,7 @@ mod update_market {
                     treasury_addr: None,
                     start_timestamp: None,
                     fee_spread_odds: None,
-                    max_bet_risk_factor: Some(Decimal::from_atomics(10_1_u128, 1).unwrap()),
+                    max_bet_risk_factor: Some(Decimal::from_atomics(101_u128, 1).unwrap()),
                     seed_liquidity_amplifier: None,
                     initial_odds_home: None,
                     initial_odds_away: None,
@@ -3053,7 +3053,7 @@ mod update_market {
             )
             .unwrap_err();
         assert_eq!(
-            ContractError::InvalidMaxBetRiskFactor(Decimal::from_atomics(10_1_u128, 1).unwrap()),
+            ContractError::InvalidMaxBetRiskFactor(Decimal::from_atomics(101_u128, 1).unwrap()),
             err.downcast::<ContractError>().unwrap()
         );
 
@@ -3141,7 +3141,7 @@ mod update_market {
                     start_timestamp: None,
                     fee_spread_odds: None,
                     max_bet_risk_factor: None,
-                    seed_liquidity_amplifier: Some(Decimal::from_atomics(10_1_u128, 1).unwrap()),
+                    seed_liquidity_amplifier: Some(Decimal::from_atomics(101_u128, 1).unwrap()),
                     initial_odds_home: None,
                     initial_odds_away: None,
                 },
@@ -3149,7 +3149,7 @@ mod update_market {
             .unwrap_err();
         assert_eq!(
             ContractError::InvalidSeedLiquidityAmplifier(
-                Decimal::from_atomics(10_1_u128, 1).unwrap()
+                Decimal::from_atomics(101_u128, 1).unwrap()
             ),
             err.downcast::<ContractError>().unwrap()
         );
