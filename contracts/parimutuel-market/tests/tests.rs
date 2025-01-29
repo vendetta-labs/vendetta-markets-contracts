@@ -1,8 +1,7 @@
-use cosmwasm_std::{coin, coins, Addr, Timestamp, Uint128};
+use cosmwasm_std::{coin, coins, Timestamp, Uint128};
 use cw_multi_test::MockApiBech32;
 use helpers::setup_blockchain_and_contract;
 use parimutuel_market::{
-    contract::{ADMIN_ADDRESS, TREASURY_ADDRESS},
     error::ContractError,
     msg::InstantiateMsg,
     state::{MarketResult, Status},
@@ -14,6 +13,8 @@ mod helpers;
 const NATIVE_DENOM: &str = "denom";
 const NATIVE_DENOM_PRECISION: u32 = 6;
 const FAKE_DENOM: &str = "fakedenom";
+const ADMIN: &str = "ADMIN";
+const TREASURY: &str = "TREASURY";
 const OTHER: &str = "USER_OTHER";
 const ANYONE: &str = "USER_ANYONE";
 const USER_A: &str = "USER_A";
@@ -34,12 +35,14 @@ mod create_market {
             + 60 * 5; // 5 minutes from now
 
         let blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -56,8 +59,14 @@ mod create_market {
 
         let query_config = blockchain_contract.query_config().unwrap();
         assert_eq!(250, query_config.config.fee_bps);
-        assert_eq!(ADMIN_ADDRESS, query_config.config.admin_addr.as_str());
-        assert_eq!(TREASURY_ADDRESS, query_config.config.treasury_addr.as_str());
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
         assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -75,32 +84,38 @@ mod create_market {
     }
 
     #[test]
-    fn unauthorized() {
-        let blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(USER_A),
-            vec![],
+    fn it_cant_create_a_market_with_invalid_fee_bps() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            + 60 * 5; // 5 minutes from now
+
+        let err = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
-                fee_bps: DEFAULT_FEE_BPS,
+                fee_bps: 1_001,
                 id: "game-cs2-test-league".to_string(),
                 label: "CS2 - Test League - Team A vs Team B".to_string(),
                 home_team: "Team A".to_string(),
                 away_team: "Team B".to_string(),
-                start_timestamp: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs()
-                    + 60 * 5, // 5 minutes from now
+                start_timestamp,
                 is_drawable: true,
             },
             vec![],
         )
         .unwrap_err();
-
         assert_eq!(
-            ContractError::Unauthorized {},
-            blockchain_contract.downcast::<ContractError>().unwrap()
+            ContractError::InvalidFeeBps(1_001),
+            err.downcast::<ContractError>().unwrap()
         );
     }
 }
@@ -117,10 +132,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -140,6 +155,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -253,7 +270,10 @@ mod place_bet {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
 
@@ -265,7 +285,10 @@ mod place_bet {
         assert_eq!(total_bets, market_balance.amount.into());
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -275,7 +298,10 @@ mod place_bet {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         let fee_amount = Uint128::from(total_bets)
             .multiply_ratio(Uint128::from(DEFAULT_FEE_BPS), Uint128::from(10000_u128));
@@ -368,10 +394,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -380,6 +406,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -426,10 +454,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -438,6 +466,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -487,10 +517,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -499,6 +529,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -514,7 +546,7 @@ mod place_bet {
         .unwrap();
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -555,10 +587,10 @@ mod place_bet {
         let start_timestamp = block_timestamp + 60 * 5 - 1; // 4 minutes and 59 seconds from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -567,6 +599,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -620,10 +654,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -635,6 +669,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -696,10 +732,10 @@ mod claim_winnings {
             - 60 * 10; // 10 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -712,6 +748,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -768,7 +806,10 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::AWAY)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::AWAY,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -801,10 +842,10 @@ mod claim_winnings {
             - 60 * 10; // 10 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -817,6 +858,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -873,7 +916,10 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -909,10 +955,10 @@ mod claim_winnings {
             - 60 * 10; // 10 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -925,6 +971,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -965,7 +1013,7 @@ mod claim_winnings {
         assert_eq!(0, query_bets.totals.home);
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1006,7 +1054,10 @@ mod claim_winnings {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
     }
@@ -1020,10 +1071,10 @@ mod claim_winnings {
             - 60 * 10; // 10 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1036,6 +1087,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1111,10 +1164,10 @@ mod claim_winnings {
             - 60 * 10; // 10 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1127,6 +1180,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1183,7 +1238,10 @@ mod claim_winnings {
         assert_eq!(0, other_winnings.estimate);
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1224,10 +1282,10 @@ mod claim_winnings {
             - 60 * 10; // 10 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1240,6 +1298,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1286,7 +1346,10 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1318,10 +1381,169 @@ mod claim_winnings {
 }
 
 mod update_market {
+    use parimutuel_market::msg::UpdateParams;
+
     use super::*;
 
     #[test]
-    fn proper_update_market() {
+    fn it_properly_updates_market_admin_addr() {
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                fee_bps: DEFAULT_FEE_BPS,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                start_timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    - 60 * 5, // 5 minutes ago
+                is_drawable: true,
+            },
+            vec![],
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+
+        blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: Some(MockApiBech32::new("neutron").addr_make(OTHER)),
+                    treasury_addr: None,
+                    fee_bps: None,
+                    start_timestamp: None,
+                },
+            )
+            .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(OTHER),
+            query_config.config.admin_addr
+        );
+    }
+
+    #[test]
+    fn it_properly_updates_market_treasury_addr() {
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                fee_bps: DEFAULT_FEE_BPS,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                start_timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    - 60 * 5, // 5 minutes ago
+                is_drawable: true,
+            },
+            vec![],
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
+
+        blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: Some(MockApiBech32::new("neutron").addr_make(OTHER)),
+                    fee_bps: None,
+                    start_timestamp: None,
+                },
+            )
+            .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(OTHER),
+            query_config.config.treasury_addr
+        );
+    }
+
+    #[test]
+    fn it_properly_updates_market_fee_bps() {
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                fee_bps: DEFAULT_FEE_BPS,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                start_timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 60 * 15, // 15 minutes in future
+                is_drawable: true,
+            },
+            vec![],
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(DEFAULT_FEE_BPS, query_config.config.fee_bps);
+
+        let new_fee_bps = DEFAULT_FEE_BPS * 2; // 30 minutes ago
+        blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    fee_bps: Some(new_fee_bps),
+                    start_timestamp: None,
+                },
+            )
+            .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(new_fee_bps, query_config.config.fee_bps);
+    }
+
+    #[test]
+    fn it_properly_updates_market_start_timestamp() {
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -1329,12 +1551,14 @@ mod update_market {
             - 60 * 5; // 5 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1354,7 +1578,15 @@ mod update_market {
 
         let new_start_timestamp = start_timestamp - 60 * 30; // 30 minutes ago
         blockchain_contract
-            .update_market(&Addr::unchecked(ADMIN_ADDRESS), new_start_timestamp)
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    fee_bps: None,
+                    start_timestamp: Some(new_start_timestamp),
+                },
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1370,12 +1602,14 @@ mod update_market {
             - 60 * 5; // 5 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1395,7 +1629,15 @@ mod update_market {
 
         let anyone = blockchain_contract.blockchain.api().addr_make(ANYONE);
         let err = blockchain_contract
-            .update_market(&anyone, start_timestamp - 60 * 30) // 30 minutes ago
+            .update_market(
+                &anyone,
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    fee_bps: None,
+                    start_timestamp: Some(start_timestamp - 60 * 30),
+                },
+            ) // 30 minutes ago
             .unwrap_err();
         assert_eq!(
             ContractError::Unauthorized {},
@@ -1415,12 +1657,14 @@ mod update_market {
             - 60 * 10; // 10 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1437,7 +1681,7 @@ mod update_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1446,7 +1690,7 @@ mod update_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::AWAY,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1465,14 +1709,25 @@ mod update_market {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_ne!(Status::ACTIVE, query_market.market.status);
 
         let err = blockchain_contract
-            .update_market(&Addr::unchecked(ADMIN_ADDRESS), start_timestamp - 60 * 30)
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    fee_bps: None,
+                    start_timestamp: Some(start_timestamp - 60 * 30),
+                },
+            )
             .unwrap_err();
         assert_eq!(
             ContractError::MarketNotActive {},
@@ -1481,6 +1736,58 @@ mod update_market {
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(start_timestamp, query_market.market.start_timestamp);
+    }
+
+    #[test]
+    fn it_cant_update_market_with_invalid_fee_bps() {
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                fee_bps: DEFAULT_FEE_BPS,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                start_timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    + 60 * 15, // 15 minutes in future
+                is_drawable: true,
+            },
+            vec![],
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(DEFAULT_FEE_BPS, query_config.config.fee_bps);
+
+        let err = blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    fee_bps: Some(1_001),
+                    start_timestamp: None,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidFeeBps(1_001),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(DEFAULT_FEE_BPS, query_config.config.fee_bps);
     }
 }
 
@@ -1496,12 +1803,14 @@ mod score_market {
             + 60 * 10; // 10 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1518,7 +1827,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1527,7 +1836,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::AWAY,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1546,13 +1855,19 @@ mod score_market {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap();
 
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(50_u128, treasury_balance.amount.into());
 
@@ -1570,12 +1885,14 @@ mod score_market {
             + 60 * 10; // 10 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: 0,
@@ -1592,7 +1909,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1601,7 +1918,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::AWAY,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1620,13 +1937,19 @@ mod score_market {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap();
 
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
 
@@ -1644,12 +1967,14 @@ mod score_market {
             + 60 * 10; // 10 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1666,7 +1991,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::HOME,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1675,7 +2000,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1718,12 +2043,14 @@ mod score_market {
             + 60 * 10; // 10 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1740,7 +2067,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::HOME,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1749,7 +2076,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::AWAY,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1768,7 +2095,10 @@ mod score_market {
         });
 
         let err = blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap_err();
         assert_eq!(
             ContractError::MarketNotDrawable {},
@@ -1789,12 +2119,14 @@ mod score_market {
             + 60 * 10; // 10 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1810,7 +2142,7 @@ mod score_market {
         .unwrap();
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1818,7 +2150,10 @@ mod score_market {
         assert_eq!(None, query_market.market.result);
 
         let err = blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap_err();
         assert_eq!(
             ContractError::MarketNotActive {},
@@ -1838,12 +2173,14 @@ mod score_market {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1860,7 +2197,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1869,7 +2206,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::HOME,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1888,7 +2225,10 @@ mod score_market {
         });
 
         let err = blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap_err();
         assert_eq!(
             ContractError::MarketNotScoreable {},
@@ -1906,7 +2246,10 @@ mod score_market {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1923,12 +2266,14 @@ mod score_market {
             + 60 * 10; // 10 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -1945,7 +2290,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -1964,7 +2309,10 @@ mod score_market {
         });
 
         let err = blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap_err();
         assert_eq!(
             ContractError::NoWinnings {},
@@ -1985,12 +2333,14 @@ mod score_market {
             + 60 * 10; // 10 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -2007,7 +2357,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -2016,7 +2366,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::AWAY,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -2035,7 +2385,10 @@ mod score_market {
         });
 
         let err = blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap_err();
         assert_eq!(
             ContractError::NoWinnings {},
@@ -2054,12 +2407,14 @@ mod cancel_market {
     #[test]
     fn proper_cancel_market() {
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -2082,7 +2437,7 @@ mod cancel_market {
         assert_eq!(Status::ACTIVE, query_market.market.status);
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -2092,12 +2447,14 @@ mod cancel_market {
     #[test]
     fn unauthorized() {
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -2138,12 +2495,14 @@ mod cancel_market {
             .as_secs()
             + 60 * 5; // 5 minutes from now
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 fee_bps: DEFAULT_FEE_BPS,
@@ -2160,7 +2519,7 @@ mod cancel_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::DRAW,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -2169,7 +2528,7 @@ mod cancel_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::AWAY,
                 None,
                 &coins(1_000, NATIVE_DENOM),
@@ -2188,14 +2547,17 @@ mod cancel_market {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::DRAW)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::DRAW,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_ne!(Status::ACTIVE, query_market.market.status);
 
         let err = blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap_err();
         assert_eq!(
             ContractError::MarketNotActive {},

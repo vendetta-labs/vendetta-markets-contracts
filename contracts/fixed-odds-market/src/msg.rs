@@ -5,6 +5,8 @@ use crate::state::{BetAmount, Config, Market, MarketResult};
 
 #[cw_serde]
 pub struct InstantiateMsg {
+    pub admin_addr: Addr,
+    pub treasury_addr: Addr,
     pub denom: String,
     pub denom_precision: u32,
     pub id: String,
@@ -31,6 +33,8 @@ pub enum ExecuteMsg {
     },
     // Admin
     Update {
+        admin_addr: Option<Addr>,
+        treasury_addr: Option<Addr>,
         fee_spread_odds: Option<Decimal>, // Fee spread in percentage points
         max_bet_risk_factor: Option<Decimal>, // Max bet risk factor in multiplier, ex: 1.5x
         seed_liquidity_amplifier: Option<Decimal>, // Seed liquidity amplifier in multiplier, ex: 3x
@@ -46,6 +50,8 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 pub struct UpdateParams {
+    pub admin_addr: Option<Addr>,
+    pub treasury_addr: Option<Addr>,
     pub fee_spread_odds: Option<Decimal>, // Fee spread in percentage points
     pub max_bet_risk_factor: Option<Decimal>, // Max bet risk factor in multiplier, ex: 1.5x
     pub seed_liquidity_amplifier: Option<Decimal>, // Seed liquidity amplifier in multiplier, ex: 3x

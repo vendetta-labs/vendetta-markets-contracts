@@ -12,6 +12,9 @@ pub enum ContractError {
     #[error("Invalid chain prefix: {0}")]
     InvalidChainPrefix(String),
 
+    #[error("Invalid fee bps: {0}")]
+    InvalidFeeBps(u64),
+
     #[error("Market not active")]
     MarketNotActive {},
 

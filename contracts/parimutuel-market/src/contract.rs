@@ -1,8 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{
-    to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-};
+use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
 
 use crate::{
@@ -10,18 +8,16 @@ use crate::{
     execute::{
         execute_cancel, execute_claim_winnings, execute_place_bet, execute_score, execute_update,
     },
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UpdateParams},
     queries::{
         query_bets, query_bets_by_address, query_config, query_estimate_winnings, query_market,
     },
     state::{Config, Market, Status, CONFIG, MARKET, TOTAL_AWAY, TOTAL_DRAW, TOTAL_HOME},
+    validation::validate_fee_bps,
 };
 
 pub const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-pub const ADMIN_ADDRESS: &str = "neutron15yhlj25av4fkw6s8qwnzerp490pkxmn9094g7r";
-pub const TREASURY_ADDRESS: &str = "neutron12v9pqx602k3rzm5hf4jewepl8na4x89ja4td24";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -30,9 +26,7 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    if Addr::unchecked(ADMIN_ADDRESS) != info.sender {
-        return Err(ContractError::Unauthorized {});
-    }
+    validate_fee_bps(msg.fee_bps)?;
 
     set_contract_version(
         deps.storage,
@@ -41,8 +35,8 @@ pub fn instantiate(
     )?;
 
     let state = Config {
-        admin_addr: Addr::unchecked(ADMIN_ADDRESS),
-        treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
+        admin_addr: msg.admin_addr.clone(),
+        treasury_addr: msg.treasury_addr.clone(),
         fee_bps: msg.fee_bps,
         denom: msg.denom.clone(),
         denom_precision: msg.denom_precision,
@@ -70,8 +64,8 @@ pub fn instantiate(
         .add_attribute("market_type", "parimutuel")
         .add_attribute("action", "create_market")
         .add_attribute("sender", info.sender)
-        .add_attribute("admin_addr", ADMIN_ADDRESS)
-        .add_attribute("treasury_addr", TREASURY_ADDRESS)
+        .add_attribute("admin_addr", msg.admin_addr)
+        .add_attribute("treasury_addr", msg.treasury_addr)
         .add_attribute("denom", msg.denom)
         .add_attribute("fee_bps", msg.fee_bps.to_string())
         .add_attribute("id", market.id)
@@ -110,7 +104,21 @@ pub fn execute(
             execute_place_bet(deps, env, info, result, receiver)
         }
         ExecuteMsg::ClaimWinnings { receiver } => execute_claim_winnings(deps, info, receiver),
-        ExecuteMsg::Update { start_timestamp } => execute_update(deps, info, start_timestamp),
+        ExecuteMsg::Update {
+            admin_addr,
+            treasury_addr,
+            start_timestamp,
+            fee_bps,
+        } => execute_update(
+            deps,
+            info,
+            UpdateParams {
+                admin_addr,
+                treasury_addr,
+                start_timestamp,
+                fee_bps,
+            },
+        ),
         ExecuteMsg::Score { result } => execute_score(deps, env, info, result),
         ExecuteMsg::Cancel {} => execute_cancel(deps, info),
     }

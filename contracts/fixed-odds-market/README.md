@@ -4,8 +4,11 @@
 
 ### Create Market
 - [X] It properly creates a market
-- [X] It cant create a market if sender isnt the admin
 - [X] It cant create a market if no seed liquidity is provided
+- [X] It cant create a market with invalid fee spread odds
+- [X] It cant create a market with invalid max bet risk factor
+- [X] It cant create a market with invalid seed liquidity amplifier
+- [X] It cant create a market with invalid initial odds
 
 ### Place Bet
 - [X] It properly accepts bets
@@ -26,6 +29,8 @@
 - [X] It cant claim winnings when there is nothing to claim
 
 ### Update market
+- [X] It properly updates market admin addr
+- [X] It properly updates market treasury addr
 - [X] It properly updates market start timestamp
 - [X] It properly updates market fee spread odds
 - [X] It properly updates market max bet risk factor
@@ -33,6 +38,10 @@
 - [X] It properly updates market initial odds
 - [X] It cant update market if sender isnt the admin
 - [X] It cant update market if it is no longer active
+- [X] It cant update market with invalid fee spread odds
+- [X] It cant update market with invalid max bet risk factor
+- [X] It cant update market with invalid seed liquidity amplifier
+- [X] It cant update market with invalid initial odds
 
 ### Score market
 - [X] It properly scores the market and collects fees

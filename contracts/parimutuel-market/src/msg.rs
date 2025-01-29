@@ -5,6 +5,8 @@ use crate::state::{Config, Market, MarketResult};
 
 #[cw_serde]
 pub struct InstantiateMsg {
+    pub admin_addr: Addr,
+    pub treasury_addr: Addr,
     pub fee_bps: u64, // Fee in basis points
     pub denom: String,
     pub denom_precision: u32,
@@ -27,12 +29,23 @@ pub enum ExecuteMsg {
     },
     // Admin
     Update {
-        start_timestamp: u64,
+        admin_addr: Option<Addr>,
+        treasury_addr: Option<Addr>,
+        fee_bps: Option<u64>,
+        start_timestamp: Option<u64>,
     },
     Score {
         result: MarketResult,
     },
     Cancel {},
+}
+
+#[cw_serde]
+pub struct UpdateParams {
+    pub admin_addr: Option<Addr>,
+    pub treasury_addr: Option<Addr>,
+    pub fee_bps: Option<u64>, // Fee in basis points
+    pub start_timestamp: Option<u64>,
 }
 
 #[cw_serde]

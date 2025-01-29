@@ -8,7 +8,7 @@ use parimutuel_market::{
     contract::{execute, instantiate, query},
     msg::{
         BetsByAddressResponse, BetsResponse, ConfigResponse, EstimateWinningsResponse, ExecuteMsg,
-        InstantiateMsg, MarketResponse, QueryMsg,
+        InstantiateMsg, MarketResponse, QueryMsg, UpdateParams,
     },
     state::MarketResult,
 };
@@ -74,11 +74,16 @@ impl BlockchainContract {
             .execute_contract(sender.clone(), self.addr(), &ExecuteMsg::Cancel {}, &[])
     }
 
-    pub fn update_market(&mut self, sender: &Addr, start_timestamp: u64) -> AnyResult<AppResponse> {
+    pub fn update_market(&mut self, sender: &Addr, params: UpdateParams) -> AnyResult<AppResponse> {
         self.blockchain.execute_contract(
             sender.clone(),
             self.addr(),
-            &ExecuteMsg::Update { start_timestamp },
+            &ExecuteMsg::Update {
+                admin_addr: params.admin_addr,
+                treasury_addr: params.treasury_addr,
+                fee_bps: params.fee_bps,
+                start_timestamp: params.start_timestamp,
+            },
             &[],
         )
     }

@@ -5,10 +5,12 @@ use cosmwasm_std::{
 use crate::{
     error::ContractError,
     logic::calculate_parimutuel_winnings,
+    msg::UpdateParams,
     state::{
         MarketResult, Status, CLAIMS, CONFIG, MARKET, POOL_AWAY, POOL_DRAW, POOL_HOME, TOTAL_AWAY,
         TOTAL_DRAW, TOTAL_HOME,
     },
+    validation::validate_fee_bps,
 };
 
 /// Places a bet on the market
@@ -214,7 +216,7 @@ pub fn execute_claim_winnings(
         .add_attribute("payout", payout.to_string()))
 }
 
-/// Updates the start timestamp of the market
+/// Updates the market with the new params
 ///
 /// It will make the following checks:
 /// - The sender needs to be the admin
@@ -222,9 +224,9 @@ pub fn execute_claim_winnings(
 pub fn execute_update(
     deps: DepsMut,
     info: MessageInfo,
-    start_timestamp: u64,
+    params: UpdateParams,
 ) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
+    let mut config = CONFIG.load(deps.storage)?;
     let mut market = MARKET.load(deps.storage)?;
 
     if info.sender != config.admin_addr {
@@ -235,8 +237,32 @@ pub fn execute_update(
         return Err(ContractError::MarketNotActive {});
     }
 
-    market.start_timestamp = start_timestamp;
+    let mut admin_addr_update = String::default();
+    if let Some(admin_addr) = params.admin_addr {
+        config.admin_addr = admin_addr.clone();
+        admin_addr_update = admin_addr.to_string();
+    }
 
+    let mut treasury_addr_update = String::default();
+    if let Some(treasury_addr) = params.treasury_addr {
+        config.treasury_addr = treasury_addr.clone();
+        treasury_addr_update = treasury_addr.to_string();
+    }
+
+    let mut fee_bps_update = String::default();
+    if let Some(fee_bps) = params.fee_bps {
+        validate_fee_bps(fee_bps)?;
+        config.fee_bps = fee_bps;
+        fee_bps_update = fee_bps.to_string();
+    }
+
+    let mut start_timestamp_update = String::default();
+    if let Some(start_timestamp) = params.start_timestamp {
+        market.start_timestamp = start_timestamp;
+        start_timestamp_update = start_timestamp.to_string();
+    }
+
+    CONFIG.save(deps.storage, &config)?;
     MARKET.save(deps.storage, &market)?;
 
     Ok(Response::new()
@@ -244,7 +270,10 @@ pub fn execute_update(
         .add_attribute("market_type", "parimutuel")
         .add_attribute("action", "update_market")
         .add_attribute("sender", info.sender)
-        .add_attribute("start_timestamp", start_timestamp.to_string())
+        .add_attribute("admin_addr", admin_addr_update)
+        .add_attribute("treasury_addr", treasury_addr_update)
+        .add_attribute("fee_bps", fee_bps_update)
+        .add_attribute("start_timestamp", start_timestamp_update)
         .add_attribute("total_home", TOTAL_HOME.load(deps.storage)?.to_string())
         .add_attribute("total_away", TOTAL_AWAY.load(deps.storage)?.to_string())
         .add_attribute("total_draw", TOTAL_DRAW.load(deps.storage)?.to_string()))

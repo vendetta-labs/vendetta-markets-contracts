@@ -1,4 +1,4 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{Decimal, StdError};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -11,6 +11,18 @@ pub enum ContractError {
 
     #[error("Invalid chain prefix: {0}")]
     InvalidChainPrefix(String),
+
+    #[error("Invalid odd: {0}")]
+    InvalidOdd(Decimal),
+
+    #[error("Invalid fee spread odds: {0}")]
+    InvalidFeeSpreadOdds(Decimal),
+
+    #[error("Invalid max bet risk factor: {0}")]
+    InvalidMaxBetRiskFactor(Decimal),
+
+    #[error("Invalid seed liquidity amplifier: {0}")]
+    InvalidSeedLiquidityAmplifier(Decimal),
 
     #[error("Market not initially funded")]
     MarketNotInitiallyFunded {},

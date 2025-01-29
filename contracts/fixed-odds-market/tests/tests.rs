@@ -1,7 +1,6 @@
-use cosmwasm_std::{coin, coins, Addr, Decimal, Timestamp, Uint128};
+use cosmwasm_std::{coin, coins, Decimal, Timestamp, Uint128};
 use cw_multi_test::MockApiBech32;
 use fixed_odds_market::{
-    contract::{ADMIN_ADDRESS, TREASURY_ADDRESS},
     error::ContractError,
     msg::InstantiateMsg,
     state::{MarketResult, Status},
@@ -12,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const NATIVE_DENOM: &str = "denom";
 const NATIVE_DENOM_PRECISION: u32 = 6;
 const FAKE_DENOM: &str = "fakedenom";
+const ADMIN: &str = "ADMIN";
+const TREASURY: &str = "TREASURY";
 const OTHER: &str = "OTHER";
 const ANYONE: &str = "ANYONE";
 const USER_A: &str = "USER_A";
@@ -32,13 +33,14 @@ mod create_market {
             .as_secs()
             + 60 * 5; // 5 minutes from now
 
+        let admin = MockApiBech32::new("neutron").addr_make(ADMIN);
+
         let blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
-            vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
-                coins(INITIAL_BALANCE, NATIVE_DENOM),
-            )],
+            admin.clone(),
+            vec![(admin.clone(), coins(INITIAL_BALANCE, NATIVE_DENOM))],
             InstantiateMsg {
+                admin_addr: admin.clone(),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -57,8 +59,11 @@ mod create_market {
         .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
-        assert_eq!(ADMIN_ADDRESS, query_config.config.admin_addr.as_str());
-        assert_eq!(TREASURY_ADDRESS, query_config.config.treasury_addr.as_str());
+        assert_eq!(admin.clone(), query_config.config.admin_addr);
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
         assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
         assert_eq!(
             Decimal::from_atomics(15_u128, 2).unwrap(),
@@ -107,50 +112,16 @@ mod create_market {
     }
 
     #[test]
-    fn unauthorized() {
-        let err = setup_blockchain_and_contract(
-            Addr::unchecked(USER_A),
-            vec![(
-                Addr::unchecked(USER_A),
-                coins(INITIAL_BALANCE, NATIVE_DENOM),
-            )],
-            InstantiateMsg {
-                denom: NATIVE_DENOM.to_string(),
-                denom_precision: NATIVE_DENOM_PRECISION,
-                id: "game-cs2-test-league".to_string(),
-                label: "CS2 - Test League - Team A vs Team B".to_string(),
-                home_team: "Team A".to_string(),
-                away_team: "Team B".to_string(),
-                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
-                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
-                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
-                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
-                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
-                start_timestamp: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs()
-                    + 60 * 5, // 5 minutes from now
-            },
-            coins(100_000_000, NATIVE_DENOM),
-        )
-        .unwrap_err();
-
-        assert_eq!(
-            ContractError::Unauthorized {},
-            err.downcast::<ContractError>().unwrap()
-        );
-    }
-
-    #[test]
     fn market_not_initially_funded() {
         let err = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -177,6 +148,244 @@ mod create_market {
             err.downcast::<ContractError>().unwrap()
         );
     }
+
+    #[test]
+    fn it_cant_create_a_market_with_invalid_fee_spread_odds() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            + 60 * 5; // 5 minutes from now
+
+        let admin = MockApiBech32::new("neutron").addr_make(ADMIN);
+
+        let err = setup_blockchain_and_contract(
+            admin.clone(),
+            vec![(admin.clone(), coins(INITIAL_BALANCE, NATIVE_DENOM))],
+            InstantiateMsg {
+                admin_addr: admin.clone(),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(251_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            ContractError::InvalidFeeSpreadOdds(Decimal::from_atomics(251_u128, 2).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+    }
+
+    #[test]
+    fn it_cant_create_a_market_with_invalid_max_bet_risk_factor() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            + 60 * 5; // 5 minutes from now
+
+        let admin = MockApiBech32::new("neutron").addr_make(ADMIN);
+
+        let err = setup_blockchain_and_contract(
+            admin.clone(),
+            vec![(admin.clone(), coins(INITIAL_BALANCE, NATIVE_DENOM))],
+            InstantiateMsg {
+                admin_addr: admin.clone(),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(25_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(99_u128, 2).unwrap(), // 0.99
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidMaxBetRiskFactor(Decimal::from_atomics(99_u128, 2).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let err = setup_blockchain_and_contract(
+            admin.clone(),
+            vec![(admin.clone(), coins(INITIAL_BALANCE, NATIVE_DENOM))],
+            InstantiateMsg {
+                admin_addr: admin.clone(),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(25_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(10_1_u128, 1).unwrap(), // 10.1
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidMaxBetRiskFactor(Decimal::from_atomics(10_1_u128, 1).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+    }
+
+    #[test]
+    fn it_cant_create_a_market_with_invalid_seed_liquidity_amplifier() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            + 60 * 5; // 5 minutes from now
+
+        let admin = MockApiBech32::new("neutron").addr_make(ADMIN);
+
+        let err = setup_blockchain_and_contract(
+            admin.clone(),
+            vec![(admin.clone(), coins(INITIAL_BALANCE, NATIVE_DENOM))],
+            InstantiateMsg {
+                admin_addr: admin.clone(),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(25_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(99_u128, 2).unwrap(), // 0.99
+                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidSeedLiquidityAmplifier(
+                Decimal::from_atomics(99_u128, 2).unwrap()
+            ),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let err = setup_blockchain_and_contract(
+            admin.clone(),
+            vec![(admin.clone(), coins(INITIAL_BALANCE, NATIVE_DENOM))],
+            InstantiateMsg {
+                admin_addr: admin.clone(),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(25_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(10_1_u128, 1).unwrap(), // 10.1
+                initial_odds_home: Decimal::from_atomics(2_2_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidSeedLiquidityAmplifier(
+                Decimal::from_atomics(10_1_u128, 1).unwrap()
+            ),
+            err.downcast::<ContractError>().unwrap()
+        );
+    }
+
+    #[test]
+    fn it_cant_create_a_market_with_invalid_initial_odds() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            + 60 * 5; // 5 minutes from now
+
+        let admin = MockApiBech32::new("neutron").addr_make(ADMIN);
+
+        let err = setup_blockchain_and_contract(
+            admin.clone(),
+            vec![(admin.clone(), coins(INITIAL_BALANCE, NATIVE_DENOM))],
+            InstantiateMsg {
+                admin_addr: admin.clone(),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(25_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(99_u128, 2).unwrap(), // 0.99
+                initial_odds_away: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidOdd(Decimal::from_atomics(99_u128, 2).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let err = setup_blockchain_and_contract(
+            admin.clone(),
+            vec![(admin.clone(), coins(INITIAL_BALANCE, NATIVE_DENOM))],
+            InstantiateMsg {
+                admin_addr: admin.clone(),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(25_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(1_8_u128, 1).unwrap(), // 1.8
+                initial_odds_away: Decimal::from_atomics(99_u128, 2).unwrap(), // 0.99
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidOdd(Decimal::from_atomics(99_u128, 2).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+    }
 }
 
 mod place_bet {
@@ -191,10 +400,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -211,6 +420,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -305,7 +516,10 @@ mod place_bet {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
 
@@ -317,7 +531,10 @@ mod place_bet {
         assert_eq!(180_000_000_u128, market_balance.amount.into());
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::AWAY)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::AWAY,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -331,7 +548,10 @@ mod place_bet {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(
             180_000_000_u128 - 78_900_000_u128,
@@ -431,10 +651,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -443,6 +663,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -520,7 +742,10 @@ mod place_bet {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -559,10 +784,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -571,6 +796,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -635,7 +862,10 @@ mod place_bet {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::AWAY)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::AWAY,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -696,10 +926,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -708,6 +938,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -726,7 +958,7 @@ mod place_bet {
         .unwrap();
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -772,10 +1004,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -784,6 +1016,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -848,10 +1082,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -863,6 +1097,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -934,10 +1170,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -946,6 +1182,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1003,10 +1241,10 @@ mod place_bet {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1015,6 +1253,8 @@ mod place_bet {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1076,10 +1316,10 @@ mod claim_winnings {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1092,6 +1332,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1142,7 +1384,10 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1181,10 +1426,10 @@ mod claim_winnings {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1193,6 +1438,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1232,7 +1479,10 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1274,10 +1524,10 @@ mod claim_winnings {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1290,6 +1540,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1345,7 +1597,7 @@ mod claim_winnings {
         assert_eq!(10_000_000, query_bets.total_amounts.away);
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1392,7 +1644,10 @@ mod claim_winnings {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
     }
@@ -1406,10 +1661,10 @@ mod claim_winnings {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1418,6 +1673,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1492,10 +1749,10 @@ mod claim_winnings {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1504,6 +1761,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1543,7 +1802,10 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1590,10 +1852,10 @@ mod claim_winnings {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1602,6 +1864,8 @@ mod claim_winnings {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1638,7 +1902,10 @@ mod claim_winnings {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::AWAY)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::AWAY,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -1681,6 +1948,220 @@ mod update_market {
     use super::*;
 
     #[test]
+    fn it_properly_updates_market_admin_addr() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            - 60 * 5; // 5 minutes ago
+
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+
+        let new_admin_addr = MockApiBech32::new("neutron").addr_make(OTHER);
+
+        blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: Some(new_admin_addr.clone()),
+                    treasury_addr: None,
+                    start_timestamp: None,
+                    fee_spread_odds: None,
+                    max_bet_risk_factor: None,
+                    seed_liquidity_amplifier: None,
+                    initial_odds_home: None,
+                    initial_odds_away: None,
+                },
+            )
+            .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(new_admin_addr, query_config.config.admin_addr);
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
+        assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 2).unwrap(),
+            query_config.config.fee_spread_odds
+        );
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 1).unwrap(),
+            query_config.config.max_bet_risk_factor
+        );
+        assert_eq!(
+            Decimal::from_atomics(3_u128, 0).unwrap(),
+            query_config.config.seed_liquidity_amplifier
+        );
+        assert_eq!(
+            Decimal::from_atomics(22_u128, 1).unwrap(),
+            query_config.config.initial_odds_home
+        );
+        assert_eq!(
+            Decimal::from_atomics(18_u128, 1).unwrap(),
+            query_config.config.initial_odds_away
+        );
+
+        let query_market = blockchain_contract.query_market().unwrap();
+        assert_eq!("game-cs2-test-league", query_market.market.id);
+        assert_eq!(
+            "CS2 - Test League - Team A vs Team B",
+            query_market.market.label
+        );
+        assert_eq!("Team A", query_market.market.home_team);
+        assert_eq!("Team B", query_market.market.away_team);
+        assert_eq!(start_timestamp, query_market.market.start_timestamp);
+        assert_eq!(Status::ACTIVE, query_market.market.status);
+        assert_eq!(None, query_market.market.result);
+        assert_eq!(
+            Decimal::from_atomics(1_91_u128, 2).unwrap(),
+            query_market.market.home_odds
+        );
+        assert_eq!(
+            Decimal::from_atomics(1_56_u128, 2).unwrap(),
+            query_market.market.away_odds
+        );
+    }
+
+    #[test]
+    fn it_properly_updates_market_treasury_addr() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            - 60 * 5; // 5 minutes ago
+
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
+
+        let new_treasury_addr = MockApiBech32::new("neutron").addr_make(OTHER);
+
+        blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: Some(new_treasury_addr.clone()),
+                    start_timestamp: None,
+                    fee_spread_odds: None,
+                    max_bet_risk_factor: None,
+                    seed_liquidity_amplifier: None,
+                    initial_odds_home: None,
+                    initial_odds_away: None,
+                },
+            )
+            .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+        assert_eq!(new_treasury_addr, query_config.config.treasury_addr);
+        assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 2).unwrap(),
+            query_config.config.fee_spread_odds
+        );
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 1).unwrap(),
+            query_config.config.max_bet_risk_factor
+        );
+        assert_eq!(
+            Decimal::from_atomics(3_u128, 0).unwrap(),
+            query_config.config.seed_liquidity_amplifier
+        );
+        assert_eq!(
+            Decimal::from_atomics(22_u128, 1).unwrap(),
+            query_config.config.initial_odds_home
+        );
+        assert_eq!(
+            Decimal::from_atomics(18_u128, 1).unwrap(),
+            query_config.config.initial_odds_away
+        );
+
+        let query_market = blockchain_contract.query_market().unwrap();
+        assert_eq!("game-cs2-test-league", query_market.market.id);
+        assert_eq!(
+            "CS2 - Test League - Team A vs Team B",
+            query_market.market.label
+        );
+        assert_eq!("Team A", query_market.market.home_team);
+        assert_eq!("Team B", query_market.market.away_team);
+        assert_eq!(start_timestamp, query_market.market.start_timestamp);
+        assert_eq!(Status::ACTIVE, query_market.market.status);
+        assert_eq!(None, query_market.market.result);
+        assert_eq!(
+            Decimal::from_atomics(1_91_u128, 2).unwrap(),
+            query_market.market.home_odds
+        );
+        assert_eq!(
+            Decimal::from_atomics(1_56_u128, 2).unwrap(),
+            query_market.market.away_odds
+        );
+    }
+
+    #[test]
     fn it_properly_updates_market_start_timestamp() {
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1689,12 +2170,14 @@ mod update_market {
             - 60 * 5; // 5 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1719,8 +2202,10 @@ mod update_market {
 
         blockchain_contract
             .update_market(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
                     start_timestamp: Some(new_start_timestamp),
                     fee_spread_odds: None,
                     max_bet_risk_factor: None,
@@ -1732,8 +2217,14 @@ mod update_market {
             .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
-        assert_eq!(ADMIN_ADDRESS, query_config.config.admin_addr.as_str());
-        assert_eq!(TREASURY_ADDRESS, query_config.config.treasury_addr.as_str());
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
         assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
         assert_eq!(
             Decimal::from_atomics(15_u128, 2).unwrap(),
@@ -1786,12 +2277,14 @@ mod update_market {
             - 60 * 5; // 5 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1819,8 +2312,10 @@ mod update_market {
 
         blockchain_contract
             .update_market(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
                     start_timestamp: None,
                     fee_spread_odds: Some(new_fee_spread_odds),
                     max_bet_risk_factor: None,
@@ -1832,8 +2327,14 @@ mod update_market {
             .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
-        assert_eq!(ADMIN_ADDRESS, query_config.config.admin_addr.as_str());
-        assert_eq!(TREASURY_ADDRESS, query_config.config.treasury_addr.as_str());
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
         assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
         assert_eq!(new_fee_spread_odds, query_config.config.fee_spread_odds);
         assert_eq!(
@@ -1883,10 +2384,10 @@ mod update_market {
             - 60 * 5; // 5 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -1895,6 +2396,8 @@ mod update_market {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -1938,8 +2441,10 @@ mod update_market {
 
         blockchain_contract
             .update_market(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
                     start_timestamp: None,
                     fee_spread_odds: None,
                     max_bet_risk_factor: Some(new_max_bet_risk_factor),
@@ -1979,8 +2484,14 @@ mod update_market {
         assert_eq!(0, query_bets.total_amounts.away);
 
         let query_config = blockchain_contract.query_config().unwrap();
-        assert_eq!(ADMIN_ADDRESS, query_config.config.admin_addr.as_str());
-        assert_eq!(TREASURY_ADDRESS, query_config.config.treasury_addr.as_str());
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
         assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
         assert_eq!(
             Decimal::from_atomics(15_u128, 2).unwrap(),
@@ -2033,10 +2544,10 @@ mod update_market {
             - 60 * 5; // 5 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![
                 (
-                    Addr::unchecked(ADMIN_ADDRESS),
+                    MockApiBech32::new("neutron").addr_make(ADMIN),
                     coins(INITIAL_BALANCE, NATIVE_DENOM),
                 ),
                 (
@@ -2045,6 +2556,8 @@ mod update_market {
                 ),
             ],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2088,8 +2601,10 @@ mod update_market {
 
         blockchain_contract
             .update_market(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
                     start_timestamp: None,
                     fee_spread_odds: None,
                     max_bet_risk_factor: None,
@@ -2101,8 +2616,14 @@ mod update_market {
             .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
-        assert_eq!(ADMIN_ADDRESS, query_config.config.admin_addr.as_str());
-        assert_eq!(TREASURY_ADDRESS, query_config.config.treasury_addr.as_str());
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
         assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
         assert_eq!(
             Decimal::from_atomics(15_u128, 2).unwrap(),
@@ -2155,12 +2676,14 @@ mod update_market {
             - 60 * 5; // 5 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2193,8 +2716,10 @@ mod update_market {
 
         blockchain_contract
             .update_market(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
                     start_timestamp: None,
                     fee_spread_odds: None,
                     max_bet_risk_factor: None,
@@ -2206,8 +2731,14 @@ mod update_market {
             .unwrap();
 
         let query_config = blockchain_contract.query_config().unwrap();
-        assert_eq!(ADMIN_ADDRESS, query_config.config.admin_addr.as_str());
-        assert_eq!(TREASURY_ADDRESS, query_config.config.treasury_addr.as_str());
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            query_config.config.admin_addr
+        );
+        assert_eq!(
+            MockApiBech32::new("neutron").addr_make(TREASURY),
+            query_config.config.treasury_addr
+        );
         assert_eq!(NATIVE_DENOM, query_config.config.denom.as_str());
         assert_eq!(
             Decimal::from_atomics(15_u128, 2).unwrap(),
@@ -2254,12 +2785,14 @@ mod update_market {
             - 60 * 5; // 5 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2286,6 +2819,8 @@ mod update_market {
             .update_market(
                 &anyone,
                 UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
                     start_timestamp: Some(start_timestamp - 60 * 30), // 30 minutes ago
                     fee_spread_odds: None,
                     max_bet_risk_factor: None,
@@ -2313,12 +2848,14 @@ mod update_market {
             - 60 * 10; // 10 minutes ago
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2337,7 +2874,7 @@ mod update_market {
         .unwrap();
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -2345,8 +2882,10 @@ mod update_market {
 
         let err = blockchain_contract
             .update_market(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
                     start_timestamp: Some(start_timestamp - 60 * 30), // 30 minutes ago
                     fee_spread_odds: None,
                     max_bet_risk_factor: None,
@@ -2364,6 +2903,362 @@ mod update_market {
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(start_timestamp, query_market.market.start_timestamp);
     }
+
+    #[test]
+    fn it_cant_update_market_with_invalid_fee_spread_odds() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            - 60 * 10; // 10 minutes ago
+
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 2).unwrap(),
+            query_config.config.fee_spread_odds
+        );
+
+        let err = blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    start_timestamp: None,
+                    fee_spread_odds: Some(Decimal::from_atomics(251_u128, 2).unwrap()),
+                    max_bet_risk_factor: None,
+                    seed_liquidity_amplifier: None,
+                    initial_odds_home: None,
+                    initial_odds_away: None,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidFeeSpreadOdds(Decimal::from_atomics(251_u128, 2).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 2).unwrap(),
+            query_config.config.fee_spread_odds
+        );
+    }
+
+    #[test]
+    fn it_cant_update_market_with_invalid_max_bet_risk_factor() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            - 60 * 10; // 10 minutes ago
+
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 1).unwrap(),
+            query_config.config.max_bet_risk_factor
+        );
+
+        let err = blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    start_timestamp: None,
+                    fee_spread_odds: None,
+                    max_bet_risk_factor: Some(Decimal::from_atomics(99_u128, 2).unwrap()),
+                    seed_liquidity_amplifier: None,
+                    initial_odds_home: None,
+                    initial_odds_away: None,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidMaxBetRiskFactor(Decimal::from_atomics(99_u128, 2).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 1).unwrap(),
+            query_config.config.max_bet_risk_factor
+        );
+
+        let err = blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    start_timestamp: None,
+                    fee_spread_odds: None,
+                    max_bet_risk_factor: Some(Decimal::from_atomics(10_1_u128, 1).unwrap()),
+                    seed_liquidity_amplifier: None,
+                    initial_odds_home: None,
+                    initial_odds_away: None,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidMaxBetRiskFactor(Decimal::from_atomics(10_1_u128, 1).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(15_u128, 1).unwrap(),
+            query_config.config.max_bet_risk_factor
+        );
+    }
+
+    #[test]
+    fn it_cant_update_market_with_invalid_seed_liquidity_amplifier() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            - 60 * 10; // 10 minutes ago
+
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(3_u128, 0).unwrap(),
+            query_config.config.seed_liquidity_amplifier
+        );
+
+        let err = blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    start_timestamp: None,
+                    fee_spread_odds: None,
+                    max_bet_risk_factor: None,
+                    seed_liquidity_amplifier: Some(Decimal::from_atomics(99_u128, 2).unwrap()),
+                    initial_odds_home: None,
+                    initial_odds_away: None,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidSeedLiquidityAmplifier(
+                Decimal::from_atomics(99_u128, 2).unwrap()
+            ),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(3_u128, 0).unwrap(),
+            query_config.config.seed_liquidity_amplifier
+        );
+
+        let err = blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    start_timestamp: None,
+                    fee_spread_odds: None,
+                    max_bet_risk_factor: None,
+                    seed_liquidity_amplifier: Some(Decimal::from_atomics(10_1_u128, 1).unwrap()),
+                    initial_odds_home: None,
+                    initial_odds_away: None,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidSeedLiquidityAmplifier(
+                Decimal::from_atomics(10_1_u128, 1).unwrap()
+            ),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(3_u128, 0).unwrap(),
+            query_config.config.seed_liquidity_amplifier
+        );
+    }
+
+    #[test]
+    fn it_cant_update_market_with_invalid_initial_odds() {
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+            - 60 * 10; // 10 minutes ago
+
+        let mut blockchain_contract = setup_blockchain_and_contract(
+            MockApiBech32::new("neutron").addr_make(ADMIN),
+            vec![(
+                MockApiBech32::new("neutron").addr_make(ADMIN),
+                coins(INITIAL_BALANCE, NATIVE_DENOM),
+            )],
+            InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
+                denom: NATIVE_DENOM.to_string(),
+                denom_precision: NATIVE_DENOM_PRECISION,
+                id: "game-cs2-test-league".to_string(),
+                label: "CS2 - Test League - Team A vs Team B".to_string(),
+                home_team: "Team A".to_string(),
+                away_team: "Team B".to_string(),
+                fee_spread_odds: Decimal::from_atomics(15_u128, 2).unwrap(), // 0.15
+                max_bet_risk_factor: Decimal::from_atomics(15_u128, 1).unwrap(), // 1.5
+                seed_liquidity_amplifier: Decimal::from_atomics(3_u128, 0).unwrap(), // 3
+                initial_odds_home: Decimal::from_atomics(22_u128, 1).unwrap(), // 2.2
+                initial_odds_away: Decimal::from_atomics(18_u128, 1).unwrap(), // 1.8
+                start_timestamp,
+            },
+            coins(100_000_000, NATIVE_DENOM),
+        )
+        .unwrap();
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(22_u128, 1).unwrap(),
+            query_config.config.initial_odds_home
+        );
+
+        let err = blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    start_timestamp: None,
+                    fee_spread_odds: None,
+                    max_bet_risk_factor: None,
+                    seed_liquidity_amplifier: None,
+                    initial_odds_home: Some(Decimal::from_atomics(99_u128, 2).unwrap()),
+                    initial_odds_away: None,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidOdd(Decimal::from_atomics(99_u128, 2).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(22_u128, 1).unwrap(),
+            query_config.config.initial_odds_home
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(18_u128, 1).unwrap(),
+            query_config.config.initial_odds_away
+        );
+
+        let err = blockchain_contract
+            .update_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                UpdateParams {
+                    admin_addr: None,
+                    treasury_addr: None,
+                    start_timestamp: None,
+                    fee_spread_odds: None,
+                    max_bet_risk_factor: None,
+                    seed_liquidity_amplifier: None,
+                    initial_odds_home: None,
+                    initial_odds_away: Some(Decimal::from_atomics(99_u128, 2).unwrap()),
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::InvalidOdd(Decimal::from_atomics(99_u128, 2).unwrap()),
+            err.downcast::<ContractError>().unwrap()
+        );
+
+        let query_config = blockchain_contract.query_config().unwrap();
+        assert_eq!(
+            Decimal::from_atomics(18_u128, 1).unwrap(),
+            query_config.config.initial_odds_away
+        );
+    }
 }
 
 mod score_market {
@@ -2378,12 +3273,14 @@ mod score_market {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2403,7 +3300,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::HOME,
                 Decimal::from_atomics(1_91_u128, 2).unwrap(),
                 None,
@@ -2413,7 +3310,7 @@ mod score_market {
 
         blockchain_contract
             .place_bet(
-                &Addr::unchecked(ADMIN_ADDRESS),
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
                 MarketResult::AWAY,
                 Decimal::from_atomics(1_61_u128, 2).unwrap(),
                 None,
@@ -2436,18 +3333,27 @@ mod score_market {
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(0_u128, treasury_balance.amount.into());
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::AWAY)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::AWAY,
+            )
             .unwrap();
 
         let treasury_balance = blockchain_contract
             .blockchain
             .wrap()
-            .query_balance(Addr::unchecked(TREASURY_ADDRESS), NATIVE_DENOM)
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
             .unwrap();
         assert_eq!(103_900_000_u128, treasury_balance.amount.into());
 
@@ -2465,12 +3371,14 @@ mod score_market {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2519,12 +3427,14 @@ mod score_market {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2543,7 +3453,7 @@ mod score_market {
         .unwrap();
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -2551,7 +3461,10 @@ mod score_market {
         assert_eq!(None, query_market.market.result);
 
         let err = blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap_err();
         assert_eq!(
             ContractError::MarketNotActive {},
@@ -2571,12 +3484,14 @@ mod score_market {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2601,7 +3516,10 @@ mod score_market {
         });
 
         let err = blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap_err();
         assert_eq!(
             ContractError::MarketNotScoreable {},
@@ -2619,7 +3537,10 @@ mod score_market {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -2640,12 +3561,14 @@ mod cancel_market {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2667,7 +3590,7 @@ mod cancel_market {
         assert_eq!(Status::ACTIVE, query_market.market.status);
 
         blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
@@ -2677,12 +3600,14 @@ mod cancel_market {
     #[test]
     fn unauthorized() {
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2727,12 +3652,14 @@ mod cancel_market {
             + 60 * 5; // 5 minutes from now
 
         let mut blockchain_contract = setup_blockchain_and_contract(
-            Addr::unchecked(ADMIN_ADDRESS),
+            MockApiBech32::new("neutron").addr_make(ADMIN),
             vec![(
-                Addr::unchecked(ADMIN_ADDRESS),
+                MockApiBech32::new("neutron").addr_make(ADMIN),
                 coins(INITIAL_BALANCE, NATIVE_DENOM),
             )],
             InstantiateMsg {
+                admin_addr: MockApiBech32::new("neutron").addr_make(ADMIN),
+                treasury_addr: MockApiBech32::new("neutron").addr_make(TREASURY),
                 denom: NATIVE_DENOM.to_string(),
                 denom_precision: NATIVE_DENOM_PRECISION,
                 id: "game-cs2-test-league".to_string(),
@@ -2757,14 +3684,17 @@ mod cancel_market {
         });
 
         blockchain_contract
-            .score_market(&Addr::unchecked(ADMIN_ADDRESS), MarketResult::HOME)
+            .score_market(
+                &MockApiBech32::new("neutron").addr_make(ADMIN),
+                MarketResult::HOME,
+            )
             .unwrap();
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_ne!(Status::ACTIVE, query_market.market.status);
 
         let err = blockchain_contract
-            .cancel_market(&Addr::unchecked(ADMIN_ADDRESS))
+            .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap_err();
         assert_eq!(
             ContractError::MarketNotActive {},

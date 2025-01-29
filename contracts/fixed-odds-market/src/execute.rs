@@ -11,6 +11,10 @@ use crate::{
         MarketResult, Status, ADDR_BETS_AWAY, ADDR_BETS_HOME, CLAIMS, CONFIG, MARKET,
         POTENTIAL_PAYOUT_AWAY, POTENTIAL_PAYOUT_HOME, TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
     },
+    validation::{
+        validate_fee_spread_odds, validate_max_bet_risk_factor, validate_odd,
+        validate_seed_liquidity_amplifier,
+    },
 };
 
 /// Places a bet on the market
@@ -276,32 +280,54 @@ pub fn execute_update(
         return Err(ContractError::MarketNotActive {});
     }
 
+    let mut admin_addr_update = String::default();
+    if let Some(admin_addr) = params.admin_addr {
+        config.admin_addr = admin_addr.clone();
+        admin_addr_update = admin_addr.to_string();
+    }
+
+    let mut treasury_addr_update = String::default();
+    if let Some(treasury_addr) = params.treasury_addr {
+        config.treasury_addr = treasury_addr.clone();
+        treasury_addr_update = treasury_addr.to_string();
+    }
+
     let mut fee_spread_odds_update = String::default();
     if let Some(fee_spread_odds) = params.fee_spread_odds {
+        validate_fee_spread_odds(fee_spread_odds)?;
+
         config.fee_spread_odds = fee_spread_odds;
         fee_spread_odds_update = fee_spread_odds.to_string();
     }
 
     let mut max_bet_risk_factor_update = String::default();
     if let Some(max_bet_risk_factor) = params.max_bet_risk_factor {
+        validate_max_bet_risk_factor(max_bet_risk_factor)?;
+
         config.max_bet_risk_factor = max_bet_risk_factor;
         max_bet_risk_factor_update = max_bet_risk_factor.to_string();
     }
 
     let mut seed_liquidity_amplifier_update = String::default();
     if let Some(seed_liquidity_amplifier) = params.seed_liquidity_amplifier {
+        validate_seed_liquidity_amplifier(seed_liquidity_amplifier)?;
+
         config.seed_liquidity_amplifier = seed_liquidity_amplifier;
         seed_liquidity_amplifier_update = seed_liquidity_amplifier.to_string();
     }
 
     let mut initial_odds_home_update = String::default();
     if let Some(initial_odds_home) = params.initial_odds_home {
+        validate_odd(initial_odds_home)?;
+
         config.initial_odds_home = initial_odds_home;
         initial_odds_home_update = initial_odds_home.to_string();
     }
 
     let mut initial_odds_away_update = String::default();
     if let Some(initial_odds_away) = params.initial_odds_away {
+        validate_odd(initial_odds_away)?;
+
         config.initial_odds_away = initial_odds_away;
         initial_odds_away_update = initial_odds_away.to_string();
     }
@@ -351,6 +377,8 @@ pub fn execute_update(
         .add_attribute("market_type", "fixed-odds")
         .add_attribute("action", "update_market")
         .add_attribute("sender", info.sender)
+        .add_attribute("admin_addr", admin_addr_update)
+        .add_attribute("treasury_addr", treasury_addr_update)
         .add_attribute("fee_spread_odds", fee_spread_odds_update)
         .add_attribute("max_bet_risk_factor", max_bet_risk_factor_update)
         .add_attribute("seed_liquidity_amplifier", seed_liquidity_amplifier_update)

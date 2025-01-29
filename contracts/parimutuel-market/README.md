@@ -4,7 +4,7 @@
 
 ### Create Market
 - [X] It properly creates a market
-- [X] It cant create a market if sender isnt the admin
+- [X] It cant create a market with invalid fee bps
 
 ### Place Bet
 - [X] It properly accepts bets
@@ -23,9 +23,13 @@
 - [X] It cant claim winnings when there is nothing to claim
 
 ### Update market
-- [X] It properly updates market
+- [X] It properly updates market admin addr
+- [X] It properly updates market treasury addr
+- [X] It properly updates market start timestamp
+- [X] It properly updates market fee bps
 - [X] It cant update market if sender isnt the admin
 - [X] It cant update market if it is no longer active
+- [X] It cant update market with invalid fee bps
 
 ### Score market
 - [X] It properly scores the market and collects fees

@@ -71,6 +71,8 @@ impl BlockchainContract {
             sender.clone(),
             self.addr(),
             &ExecuteMsg::Update {
+                admin_addr: params.admin_addr,
+                treasury_addr: params.treasury_addr,
                 fee_spread_odds: params.fee_spread_odds,
                 max_bet_risk_factor: params.max_bet_risk_factor,
                 seed_liquidity_amplifier: params.seed_liquidity_amplifier,

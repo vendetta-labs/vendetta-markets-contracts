@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 
@@ -17,13 +17,14 @@ use crate::{
         Config, Market, Status, CONFIG, MARKET, POTENTIAL_PAYOUT_AWAY, POTENTIAL_PAYOUT_HOME,
         TOTAL_BETS_AWAY, TOTAL_BETS_HOME,
     },
+    validation::{
+        validate_fee_spread_odds, validate_max_bet_risk_factor, validate_odd,
+        validate_seed_liquidity_amplifier,
+    },
 };
 
 pub const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-pub const ADMIN_ADDRESS: &str = "neutron15yhlj25av4fkw6s8qwnzerp490pkxmn9094g7r";
-pub const TREASURY_ADDRESS: &str = "neutron12v9pqx602k3rzm5hf4jewepl8na4x89ja4td24";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -32,9 +33,11 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    if Addr::unchecked(ADMIN_ADDRESS) != info.sender {
-        return Err(ContractError::Unauthorized {});
-    }
+    validate_fee_spread_odds(msg.fee_spread_odds)?;
+    validate_max_bet_risk_factor(msg.max_bet_risk_factor)?;
+    validate_seed_liquidity_amplifier(msg.seed_liquidity_amplifier)?;
+    validate_odd(msg.initial_odds_home)?;
+    validate_odd(msg.initial_odds_away)?;
 
     let market_balance = deps
         .querier
@@ -52,8 +55,8 @@ pub fn instantiate(
     )?;
 
     let config = Config {
-        admin_addr: Addr::unchecked(ADMIN_ADDRESS),
-        treasury_addr: Addr::unchecked(TREASURY_ADDRESS),
+        admin_addr: msg.admin_addr.clone(),
+        treasury_addr: msg.treasury_addr.clone(),
         denom: msg.denom.clone(),
         denom_precision: msg.denom_precision,
         fee_spread_odds: msg.fee_spread_odds,
@@ -95,8 +98,8 @@ pub fn instantiate(
         .add_attribute("market_type", "fixed-odds")
         .add_attribute("action", "create_market")
         .add_attribute("sender", info.sender)
-        .add_attribute("admin_addr", ADMIN_ADDRESS)
-        .add_attribute("treasury_addr", TREASURY_ADDRESS)
+        .add_attribute("admin_addr", msg.admin_addr.to_string())
+        .add_attribute("treasury_addr", msg.treasury_addr.to_string())
         .add_attribute("denom", msg.denom)
         .add_attribute("fee_spread_odds", msg.fee_spread_odds.to_string())
         .add_attribute("max_bet_risk_factor", msg.max_bet_risk_factor.to_string())
@@ -146,6 +149,8 @@ pub fn execute(
         } => execute_place_bet(deps, env, info, result, min_odds, receiver),
         ExecuteMsg::ClaimWinnings { receiver } => execute_claim_winnings(deps, info, receiver),
         ExecuteMsg::Update {
+            admin_addr,
+            treasury_addr,
             fee_spread_odds,
             max_bet_risk_factor,
             seed_liquidity_amplifier,
@@ -157,6 +162,8 @@ pub fn execute(
             env,
             info,
             UpdateParams {
+                admin_addr,
+                treasury_addr,
                 fee_spread_odds,
                 max_bet_risk_factor,
                 seed_liquidity_amplifier,

@@ -1,0 +1,581 @@
+{
+  "contract_name": "parimutuel-market",
+  "contract_version": "2.0.0",
+  "idl_version": "1.0.0",
+  "instantiate": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "InstantiateMsg",
+    "type": "object",
+    "required": [
+      "admin_addr",
+      "away_team",
+      "denom",
+      "denom_precision",
+      "fee_bps",
+      "home_team",
+      "id",
+      "is_drawable",
+      "label",
+      "start_timestamp",
+      "treasury_addr"
+    ],
+    "properties": {
+      "admin_addr": {
+        "$ref": "#/definitions/Addr"
+      },
+      "away_team": {
+        "type": "string"
+      },
+      "denom": {
+        "type": "string"
+      },
+      "denom_precision": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0.0
+      },
+      "fee_bps": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0.0
+      },
+      "home_team": {
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "is_drawable": {
+        "type": "boolean"
+      },
+      "label": {
+        "type": "string"
+      },
+      "start_timestamp": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0.0
+      },
+      "treasury_addr": {
+        "$ref": "#/definitions/Addr"
+      }
+    },
+    "additionalProperties": false,
+    "definitions": {
+      "Addr": {
+        "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+        "type": "string"
+      }
+    }
+  },
+  "execute": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ExecuteMsg",
+    "oneOf": [
+      {
+        "type": "object",
+        "required": [
+          "place_bet"
+        ],
+        "properties": {
+          "place_bet": {
+            "type": "object",
+            "required": [
+              "result"
+            ],
+            "properties": {
+              "receiver": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result": {
+                "$ref": "#/definitions/MarketResult"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "claim_winnings"
+        ],
+        "properties": {
+          "claim_winnings": {
+            "type": "object",
+            "properties": {
+              "receiver": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "update"
+        ],
+        "properties": {
+          "update": {
+            "type": "object",
+            "properties": {
+              "admin_addr": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fee_bps": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0.0
+              },
+              "start_timestamp": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0.0
+              },
+              "treasury_addr": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "score"
+        ],
+        "properties": {
+          "score": {
+            "type": "object",
+            "required": [
+              "result"
+            ],
+            "properties": {
+              "result": {
+                "$ref": "#/definitions/MarketResult"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "cancel"
+        ],
+        "properties": {
+          "cancel": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "definitions": {
+      "Addr": {
+        "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+        "type": "string"
+      },
+      "MarketResult": {
+        "type": "string",
+        "enum": [
+          "HOME",
+          "AWAY",
+          "DRAW"
+        ]
+      }
+    }
+  },
+  "query": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "QueryMsg",
+    "oneOf": [
+      {
+        "type": "object",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "market"
+        ],
+        "properties": {
+          "market": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "bets"
+        ],
+        "properties": {
+          "bets": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "bets_by_address"
+        ],
+        "properties": {
+          "bets_by_address": {
+            "type": "object",
+            "required": [
+              "address"
+            ],
+            "properties": {
+              "address": {
+                "$ref": "#/definitions/Addr"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "estimate_winnings"
+        ],
+        "properties": {
+          "estimate_winnings": {
+            "type": "object",
+            "required": [
+              "address",
+              "result"
+            ],
+            "properties": {
+              "address": {
+                "$ref": "#/definitions/Addr"
+              },
+              "result": {
+                "$ref": "#/definitions/MarketResult"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "definitions": {
+      "Addr": {
+        "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+        "type": "string"
+      },
+      "MarketResult": {
+        "type": "string",
+        "enum": [
+          "HOME",
+          "AWAY",
+          "DRAW"
+        ]
+      }
+    }
+  },
+  "migrate": null,
+  "sudo": null,
+  "responses": {
+    "bets": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BetsResponse",
+      "type": "object",
+      "required": [
+        "totals"
+      ],
+      "properties": {
+        "totals": {
+          "$ref": "#/definitions/TotalBets"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "TotalBets": {
+          "type": "object",
+          "required": [
+            "away",
+            "draw",
+            "home"
+          ],
+          "properties": {
+            "away": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            },
+            "draw": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            },
+            "home": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "bets_by_address": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BetsByAddressResponse",
+      "type": "object",
+      "required": [
+        "address",
+        "totals"
+      ],
+      "properties": {
+        "address": {
+          "$ref": "#/definitions/Addr"
+        },
+        "totals": {
+          "$ref": "#/definitions/TotalBets"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Addr": {
+          "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+          "type": "string"
+        },
+        "TotalBets": {
+          "type": "object",
+          "required": [
+            "away",
+            "draw",
+            "home"
+          ],
+          "properties": {
+            "away": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            },
+            "draw": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            },
+            "home": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "config": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ConfigResponse",
+      "type": "object",
+      "required": [
+        "config"
+      ],
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/Config"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Addr": {
+          "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+          "type": "string"
+        },
+        "Config": {
+          "type": "object",
+          "required": [
+            "admin_addr",
+            "denom",
+            "denom_precision",
+            "fee_bps",
+            "treasury_addr"
+          ],
+          "properties": {
+            "admin_addr": {
+              "$ref": "#/definitions/Addr"
+            },
+            "denom": {
+              "type": "string"
+            },
+            "denom_precision": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "fee_bps": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "treasury_addr": {
+              "$ref": "#/definitions/Addr"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "estimate_winnings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "EstimateWinningsResponse",
+      "type": "object",
+      "required": [
+        "estimate"
+      ],
+      "properties": {
+        "estimate": {
+          "type": "integer",
+          "format": "uint128",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "market": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MarketResponse",
+      "type": "object",
+      "required": [
+        "market"
+      ],
+      "properties": {
+        "market": {
+          "$ref": "#/definitions/Market"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Market": {
+          "type": "object",
+          "required": [
+            "away_team",
+            "home_team",
+            "id",
+            "is_drawable",
+            "label",
+            "start_timestamp",
+            "status"
+          ],
+          "properties": {
+            "away_team": {
+              "type": "string"
+            },
+            "home_team": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "is_drawable": {
+              "type": "boolean"
+            },
+            "label": {
+              "type": "string"
+            },
+            "result": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/MarketResult"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "start_timestamp": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "status": {
+              "$ref": "#/definitions/Status"
+            }
+          },
+          "additionalProperties": false
+        },
+        "MarketResult": {
+          "type": "string",
+          "enum": [
+            "HOME",
+            "AWAY",
+            "DRAW"
+          ]
+        },
+        "Status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "CLOSED",
+            "CANCELLED"
+          ]
+        }
+      }
+    }
+  }
+}
