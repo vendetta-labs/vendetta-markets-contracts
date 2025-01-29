@@ -17,12 +17,19 @@ This repository contains the source code for the core smart contracts of Vendett
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 rustup default 1.81
 rustup target add wasm32-unknown-unknown
+cargo install cargo-make
 ```
 
 ### Run tests
 
 ```bash
 cargo test
+```
+
+### Generate schemas
+
+```bash
+cargo make generate-schemas
 ```
 
 ## How to prepare for audit

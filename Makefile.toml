@@ -1,0 +1,4 @@
+extend = [{ path = "schema.Makefile.toml" }]
+
+[config]
+default_to_workspace = false

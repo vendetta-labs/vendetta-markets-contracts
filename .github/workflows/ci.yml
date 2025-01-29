@@ -61,3 +61,25 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+
+  schema:
+    name: Schema
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: 1.83.0
+          override: true
+
+      - name: Install cargo make
+        uses: davidB/rust-cargo-make@v1
+
+      - name: Generate and check schema
+        run: |
+          cargo make generate-schemas
+          git diff --exit-code
