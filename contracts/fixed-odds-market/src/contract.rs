@@ -101,6 +101,7 @@ pub fn instantiate(
         .add_attribute("admin_addr", msg.admin_addr.to_string())
         .add_attribute("treasury_addr", msg.treasury_addr.to_string())
         .add_attribute("denom", msg.denom)
+        .add_attribute("denom_precision", msg.denom_precision.to_string())
         .add_attribute("fee_spread_odds", msg.fee_spread_odds.to_string())
         .add_attribute("max_bet_risk_factor", msg.max_bet_risk_factor.to_string())
         .add_attribute(

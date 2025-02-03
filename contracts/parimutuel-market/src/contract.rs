@@ -67,6 +67,7 @@ pub fn instantiate(
         .add_attribute("admin_addr", msg.admin_addr)
         .add_attribute("treasury_addr", msg.treasury_addr)
         .add_attribute("denom", msg.denom)
+        .add_attribute("denom_precision", msg.denom_precision.to_string())
         .add_attribute("fee_bps", msg.fee_bps.to_string())
         .add_attribute("id", market.id)
         .add_attribute("label", market.label)
