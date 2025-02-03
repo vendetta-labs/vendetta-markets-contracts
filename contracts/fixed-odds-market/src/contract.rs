@@ -108,6 +108,7 @@ pub fn instantiate(
             "seed_liquidity_amplifier",
             msg.seed_liquidity_amplifier.to_string(),
         )
+        .add_attribute("seed_liquidity", market_balance.to_string())
         .add_attribute("initial_odds_home", msg.initial_odds_home.to_string())
         .add_attribute("initial_odds_away", msg.initial_odds_away.to_string())
         .add_attribute("id", market.id)

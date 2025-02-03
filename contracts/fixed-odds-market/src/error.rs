@@ -15,6 +15,9 @@ pub enum ContractError {
     #[error("Invalid odd: {0}")]
     InvalidOdd(Decimal),
 
+    #[error("Invalid odds combination")]
+    InvalidOddsCombination,
+
     #[error("Invalid fee spread odds: {0}")]
     InvalidFeeSpreadOdds(Decimal),
 

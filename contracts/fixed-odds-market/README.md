@@ -42,6 +42,7 @@
 - [X] It cant update market with invalid max bet risk factor
 - [X] It cant update market with invalid seed liquidity amplifier
 - [X] It cant update market with invalid initial odds
+- [X] It cant update market with only one initial odd
 
 ### Score market
 - [X] It properly scores the market and collects fees

@@ -317,18 +317,25 @@ pub fn execute_update(
     }
 
     let mut initial_odds_home_update = String::default();
-    if let Some(initial_odds_home) = params.initial_odds_home {
-        validate_odd(initial_odds_home)?;
-
-        config.initial_odds_home = initial_odds_home;
-        initial_odds_home_update = initial_odds_home.to_string();
-    }
-
     let mut initial_odds_away_update = String::default();
-    if let Some(initial_odds_away) = params.initial_odds_away {
+    let initial_odds_home = match params.initial_odds_home {
+        Some(initial_odds_home) => initial_odds_home,
+        None => Decimal::zero(),
+    };
+    let initial_odds_away = match params.initial_odds_away {
+        Some(initial_odds_away) => initial_odds_away,
+        None => Decimal::zero(),
+    };
+    if initial_odds_home != Decimal::zero() || initial_odds_away != Decimal::zero() {
+        if initial_odds_home == Decimal::zero() || initial_odds_away == Decimal::zero() {
+            return Err(ContractError::InvalidOddsCombination);
+        }
+        validate_odd(initial_odds_home)?;
         validate_odd(initial_odds_away)?;
 
+        config.initial_odds_home = initial_odds_home;
         config.initial_odds_away = initial_odds_away;
+        initial_odds_home_update = initial_odds_home.to_string();
         initial_odds_away_update = initial_odds_away.to_string();
     }
 
