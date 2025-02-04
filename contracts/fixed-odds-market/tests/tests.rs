@@ -1415,6 +1415,26 @@ mod claim_winnings {
             INITIAL_BALANCE + 9_100_000_u128,
             user_a_balance.amount.into()
         );
+
+        let treasury_balance = blockchain_contract
+            .blockchain
+            .wrap()
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
+            .unwrap();
+        assert_eq!(
+            100_000_000_u128 - 9_100_000_u128 + 5_000_000_u128,
+            treasury_balance.amount.into()
+        );
+
+        let contract_balance = blockchain_contract
+            .blockchain
+            .wrap()
+            .query_balance(blockchain_contract.addr(), NATIVE_DENOM)
+            .unwrap();
+        assert_eq!(0_u128, contract_balance.amount.into());
     }
 
     #[test]
@@ -1649,7 +1669,14 @@ mod claim_winnings {
                 NATIVE_DENOM,
             )
             .unwrap();
-        assert_eq!(0_u128, treasury_balance.amount.into());
+        assert_eq!(100_000_000_u128, treasury_balance.amount.into());
+
+        let contract_balance = blockchain_contract
+            .blockchain
+            .wrap()
+            .query_balance(blockchain_contract.addr(), NATIVE_DENOM)
+            .unwrap();
+        assert_eq!(0_u128, contract_balance.amount.into());
     }
 
     #[test]
@@ -3652,7 +3679,7 @@ mod cancel_market {
     use super::*;
 
     #[test]
-    fn proper_cancel_market() {
+    fn it_properly_cancels_the_market_and_recovers_seed_liquidity() {
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -3688,9 +3715,36 @@ mod cancel_market {
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::ACTIVE, query_market.market.status);
 
+        let treasury_balance = blockchain_contract
+            .blockchain
+            .wrap()
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
+            .unwrap();
+        assert_eq!(0_u128, treasury_balance.amount.into());
+
         blockchain_contract
             .cancel_market(&MockApiBech32::new("neutron").addr_make(ADMIN))
             .unwrap();
+
+        let treasury_balance = blockchain_contract
+            .blockchain
+            .wrap()
+            .query_balance(
+                MockApiBech32::new("neutron").addr_make(TREASURY),
+                NATIVE_DENOM,
+            )
+            .unwrap();
+        assert_eq!(100_000_000_u128, treasury_balance.amount.into());
+
+        let contract_balance = blockchain_contract
+            .blockchain
+            .wrap()
+            .query_balance(blockchain_contract.addr(), NATIVE_DENOM)
+            .unwrap();
+        assert_eq!(0_u128, contract_balance.amount.into());
 
         let query_market = blockchain_contract.query_market().unwrap();
         assert_eq!(Status::CANCELLED, query_market.market.status);

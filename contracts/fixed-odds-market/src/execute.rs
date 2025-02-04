@@ -535,6 +535,23 @@ pub fn execute_cancel(
         .querier
         .query_balance(&env.contract.address, &config.denom)?
         .amount;
+    let total_bets_home = TOTAL_BETS_HOME.load(deps.storage)?;
+    let total_bets_away = TOTAL_BETS_AWAY.load(deps.storage)?;
+
+    let market_outstanding_balance =
+        market_balance - Uint128::from(total_bets_home) - Uint128::from(total_bets_away);
+    println!("market_outstanding_balance: {}", market_outstanding_balance);
+
+    let mut messages: Vec<CosmosMsg> = vec![];
+    if market_outstanding_balance > Uint128::zero() {
+        messages.push(
+            BankMsg::Send {
+                to_address: config.treasury_addr.to_string(),
+                amount: vec![coin(market_outstanding_balance.into(), &config.denom)],
+            }
+            .into(),
+        );
+    }
 
     let potential_payout_home = POTENTIAL_PAYOUT_HOME.load(deps.storage)?;
     let potential_payout_away = POTENTIAL_PAYOUT_AWAY.load(deps.storage)?;
@@ -552,11 +569,13 @@ pub fn execute_cancel(
     );
 
     Ok(Response::new()
+        .add_messages(messages)
         .add_attribute("protocol", "vendetta-markets")
         .add_attribute("market_type", "fixed-odds")
         .add_attribute("action", "cancel_market")
         .add_attribute("sender", info.sender)
         .add_attribute("status", Status::CANCELLED.to_string())
+        .add_attribute("market_outstanding_balance", market_outstanding_balance)
         .add_attribute("home_odds", market.home_odds.to_string())
         .add_attribute("away_odds", market.away_odds.to_string())
         .add_attribute("home_max_bet", home_max_bet.to_string())

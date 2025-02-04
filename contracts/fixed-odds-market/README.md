@@ -51,6 +51,6 @@
 - [X] It can only score the market after 30 minutes of its start timestamp
 
 ### Cancel market
-- [X] It properly cancels the market
+- [X] It properly cancels the market and recovers seed liquidity
 - [X] It cant cancel the market if sender isnt the admin
 - [X] It cant cancel the market if it is no longer active
