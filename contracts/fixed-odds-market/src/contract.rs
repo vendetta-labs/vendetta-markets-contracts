@@ -61,6 +61,7 @@ pub fn instantiate(
         denom_precision: msg.denom_precision,
         fee_spread_odds: msg.fee_spread_odds,
         max_bet_risk_factor: msg.max_bet_risk_factor,
+        seed_liquidity: market_balance,
         seed_liquidity_amplifier: msg.seed_liquidity_amplifier,
         initial_odds_home: msg.initial_odds_home,
         initial_odds_away: msg.initial_odds_away,

@@ -449,14 +449,37 @@ pub fn execute_score(
     let market_outstanding_balance = market_balance - Uint128::from(market_payout);
 
     let mut messages: Vec<CosmosMsg> = vec![];
+    let mut market_profit: Uint128 = Uint128::zero();
+    let mut market_loss: Uint128 = Uint128::zero();
     if market_outstanding_balance > Uint128::zero() {
-        messages.push(
-            BankMsg::Send {
-                to_address: config.treasury_addr.to_string(),
-                amount: vec![coin(market_outstanding_balance.into(), &config.denom)],
-            }
-            .into(),
-        );
+        if market_outstanding_balance > config.seed_liquidity {
+            market_profit = market_outstanding_balance - config.seed_liquidity;
+            messages.push(
+                BankMsg::Send {
+                    to_address: config.treasury_addr.to_string(),
+                    amount: vec![coin(market_profit.into(), &config.denom)],
+                }
+                .into(),
+            );
+            messages.push(
+                BankMsg::Send {
+                    to_address: config.admin_addr.to_string(),
+                    amount: vec![coin(config.seed_liquidity.into(), &config.denom)],
+                }
+                .into(),
+            );
+        } else {
+            market_loss = config.seed_liquidity - market_outstanding_balance;
+            messages.push(
+                BankMsg::Send {
+                    to_address: config.admin_addr.to_string(),
+                    amount: vec![coin(market_outstanding_balance.into(), &config.denom)],
+                }
+                .into(),
+            );
+        }
+    } else {
+        market_loss = config.seed_liquidity;
     }
 
     let potential_payout_home = POTENTIAL_PAYOUT_HOME.load(deps.storage)?;
@@ -483,6 +506,8 @@ pub fn execute_score(
         .add_attribute("status", Status::CLOSED.to_string())
         .add_attribute("result", result.to_string())
         .add_attribute("market_outstanding_balance", market_outstanding_balance)
+        .add_attribute("market_profit", market_profit)
+        .add_attribute("market_loss", market_loss)
         .add_attribute("home_odds", market.home_odds.to_string())
         .add_attribute("away_odds", market.away_odds.to_string())
         .add_attribute("home_max_bet", home_max_bet.to_string())
@@ -540,17 +565,39 @@ pub fn execute_cancel(
 
     let market_outstanding_balance =
         market_balance - Uint128::from(total_bets_home) - Uint128::from(total_bets_away);
-    println!("market_outstanding_balance: {}", market_outstanding_balance);
 
     let mut messages: Vec<CosmosMsg> = vec![];
+    let mut market_profit: Uint128 = Uint128::zero();
+    let mut market_loss: Uint128 = Uint128::zero();
     if market_outstanding_balance > Uint128::zero() {
-        messages.push(
-            BankMsg::Send {
-                to_address: config.treasury_addr.to_string(),
-                amount: vec![coin(market_outstanding_balance.into(), &config.denom)],
-            }
-            .into(),
-        );
+        if market_outstanding_balance > config.seed_liquidity {
+            market_profit = market_outstanding_balance - config.seed_liquidity;
+            messages.push(
+                BankMsg::Send {
+                    to_address: config.treasury_addr.to_string(),
+                    amount: vec![coin(market_profit.into(), &config.denom)],
+                }
+                .into(),
+            );
+            messages.push(
+                BankMsg::Send {
+                    to_address: config.admin_addr.to_string(),
+                    amount: vec![coin(config.seed_liquidity.into(), &config.denom)],
+                }
+                .into(),
+            );
+        } else {
+            market_loss = config.seed_liquidity - market_outstanding_balance;
+            messages.push(
+                BankMsg::Send {
+                    to_address: config.admin_addr.to_string(),
+                    amount: vec![coin(market_outstanding_balance.into(), &config.denom)],
+                }
+                .into(),
+            );
+        }
+    } else {
+        market_loss = config.seed_liquidity;
     }
 
     let potential_payout_home = POTENTIAL_PAYOUT_HOME.load(deps.storage)?;
@@ -576,6 +623,8 @@ pub fn execute_cancel(
         .add_attribute("sender", info.sender)
         .add_attribute("status", Status::CANCELLED.to_string())
         .add_attribute("market_outstanding_balance", market_outstanding_balance)
+        .add_attribute("market_profit", market_profit)
+        .add_attribute("market_loss", market_loss)
         .add_attribute("home_odds", market.home_odds.to_string())
         .add_attribute("away_odds", market.away_odds.to_string())
         .add_attribute("home_max_bet", home_max_bet.to_string())

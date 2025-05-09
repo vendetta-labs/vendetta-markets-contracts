@@ -1,6 +1,6 @@
 use std::fmt;
 
-use cosmwasm_std::{Addr, Decimal};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,7 @@ pub struct Config {
     pub denom_precision: u32,
     pub fee_spread_odds: Decimal,     // Fee spread in percentage points
     pub max_bet_risk_factor: Decimal, // Max bet risk factor in multiplier, ex: 1.5x
+    pub seed_liquidity: Uint128,      // Seed liquidity amount
     pub seed_liquidity_amplifier: Decimal, // Seed liquidity amplifier in multiplier, ex: 3x
     pub initial_odds_home: Decimal,
     pub initial_odds_away: Decimal,
